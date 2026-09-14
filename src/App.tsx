@@ -1,64 +1,84 @@
-import { useEffect, useState } from 'react'
-import { Pad } from './components/Pad'
+import { useCallback, useEffect, useState } from 'react'
+import { Library } from './components/Library'
+import { Login } from './components/Login'
 import { Uploader } from './components/Uploader'
 import { useEngine } from './hooks/useEngine'
+import { useSession } from './hooks/useSession'
+import { codecStartOffset } from './lib/calibration'
 import { DEV_LOOPS } from './lib/devLoops'
-import { listLocalLoops, removeLocalLoop } from './lib/localLibrary'
-import type { Loop } from './engine/types'
+import { deleteLoop, ensureUrl, fileExt, isCompressed, listLoops } from './lib/loops'
+import { supabase } from './lib/supabase'
+import type { Loop, LoopKind } from './engine/types'
 
 export default function App() {
+  const session = useSession()
+  if (session === undefined) return null
+  if (!session) return <Login />
+  return <Studio />
+}
+
+function Studio() {
   const engine = useEngine()
-  const [local, setLocal] = useState<Loop[]>([])
+  const [loops, setLoops] = useState<Loop[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [showUploader, setShowUploader] = useState(false)
 
-  useEffect(() => {
-    listLocalLoops().then(setLocal, () => {})
+  const reload = useCallback(() => {
+    listLoops().then(setLoops, (e: Error) => setError(e.message))
   }, [])
 
-  const all = [...DEV_LOOPS, ...local]
-  const drums = all.filter((l) => l.kind === 'drums')
-  const samples = all.filter((l) => l.kind === 'sample')
-  const isLocal = (loop: Loop) => local.some((l) => l.id === loop.id)
+  useEffect(reload, [reload])
 
-  const activeId = (loop: Loop) => {
-    const slot = engine[loop.kind]
-    return slot.loop?.id ?? slot.pending?.id ?? null
+  // Demo loops only until the library has something in it.
+  const library = loops && loops.length > 0 ? loops : [...DEV_LOOPS]
+
+  const activeIds: Record<LoopKind, string | null> = {
+    drums: engine.drums.loop?.id ?? engine.drums.pending?.id ?? null,
+    sample: engine.sample.loop?.id ?? engine.sample.pending?.id ?? null,
   }
 
   const onSelect = (loop: Loop) => {
-    void engine.select(loop).catch(() => {})
+    void (async () => {
+      try {
+        setError(null)
+        await ensureUrl(loop)
+        if (isCompressed(loop) && loop.startOffset === undefined) loop.startOffset = await codecStartOffset(fileExt(loop))
+        await engine.select(loop)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      }
+    })()
   }
 
   const onRemove = (loop: Loop) => {
-    if (activeId(loop) === loop.id && engine.playing) return
-    void removeLocalLoop(loop.id).then(() => setLocal((ls) => ls.filter((l) => l.id !== loop.id)))
+    if (!loop.storagePath) return // demo loop
+    if (activeIds[loop.kind] === loop.id && engine.playing) return
+    if (!window.confirm(`Delete "${loop.name}" from the library?`)) return
+    deleteLoop(loop).then(
+      () => setLoops((ls) => (ls ? ls.filter((l) => l.id !== loop.id) : ls)),
+      (e: Error) => setError(e.message),
+    )
   }
 
   const onAdded = (loop: Loop) => {
-    setLocal((ls) => [...ls, loop])
+    setLoops((ls) => [...(ls ?? []), loop])
     setShowUploader(false)
   }
 
   const onToggle = () => {
-    void engine.toggle().catch(() => {})
+    void engine.toggle().catch((e: Error) => setError(e.message))
   }
-
-  const renderPad = (loop: Loop) => (
-    <Pad
-      key={loop.id}
-      loop={loop}
-      active={activeId(loop) === loop.id}
-      loading={engine.loading.includes(loop.id)}
-      onSelect={onSelect}
-      {...(isLocal(loop) ? { onRemove } : {})}
-    />
-  )
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 bg-stone-50 p-6 text-stone-900">
       <header className="flex items-baseline justify-between">
         <h1 className="text-2xl">Loop Lab</h1>
-        <span className="font-mono text-sm text-stone-600">{engine.masterBPM} bpm</span>
+        <div className="flex items-baseline gap-4">
+          <span className="font-mono text-sm text-stone-600">{engine.masterBPM} bpm</span>
+          <button type="button" onClick={() => void supabase.auth.signOut()} className="text-xs text-stone-500 underline">
+            sign out
+          </button>
+        </div>
       </header>
 
       <button
@@ -72,16 +92,6 @@ export default function App() {
         {engine.playing ? 'Stop' : 'Play'}
       </button>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm uppercase tracking-wide text-stone-500">Drums</h2>
-        <div className="grid grid-cols-2 gap-2">{drums.map(renderPad)}</div>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm uppercase tracking-wide text-stone-500">Samples</h2>
-        <div className="grid grid-cols-2 gap-2">{samples.map(renderPad)}</div>
-      </section>
-
       {showUploader ? (
         <Uploader onAdded={onAdded} />
       ) : (
@@ -94,7 +104,20 @@ export default function App() {
         </button>
       )}
 
-      {engine.error && <p className="text-sm text-red-700">{engine.error}</p>}
+      {loops === null && !error ? (
+        <p className="text-sm text-stone-500">Loading library…</p>
+      ) : (
+        <Library
+          loops={library}
+          masterBPM={engine.masterBPM}
+          activeIds={activeIds}
+          loadingIds={engine.loading}
+          onSelect={onSelect}
+          onRemove={onRemove}
+        />
+      )}
+
+      {(error ?? engine.error) && <p className="text-sm text-red-700">{error ?? engine.error}</p>}
     </main>
   )
 }

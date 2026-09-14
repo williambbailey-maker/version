@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "gen:dev-wavs": "node scripts/gen-dev-wavs.mjs",
-    "gen:icons": "node scripts/gen-icons.mjs"
+    "gen:icons": "node scripts/gen-icons.mjs",
+    "import": "tsx scripts/import.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.1.1",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"

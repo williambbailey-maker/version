@@ -2,8 +2,8 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { getContext } from '../engine/context'
 import type { Bars, Loop, LoopKind } from '../engine/types'
-import { addLocalLoop, guessBars } from '../lib/localLibrary'
-import { estimateLoop } from '../lib/tempo'
+import { uploadLoop } from '../lib/loops'
+import { estimateLoop, guessBars, keyFromFilename } from '../lib/tempo'
 import type { TempoSource } from '../lib/tempo'
 
 type Props = {
@@ -20,7 +20,7 @@ const SOURCE_LABEL: Record<TempoSource, string> = {
   none: 'could not detect tempo',
 }
 
-/** Bare-bones add-a-loop form. Detects bpm + bars; every field stays editable. */
+/** Bare-bones add-a-loop form: detects bpm + bars, uploads the file as-is to Supabase. */
 export function Uploader({ onAdded }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null)
@@ -82,8 +82,11 @@ export function Uploader({ onAdded }: Props) {
     setBusy(true)
     setError(null)
     try {
-      const loop = await addLocalLoop(file, { name: name.trim() || file.name, bpm: bpmNum, bars, kind })
-      if (buffer) loop.buffer = buffer // already decoded; skip the reload
+      const loop = await uploadLoop(
+        file,
+        { name: name.trim() || file.name, bpm: bpmNum, bars, kind, key: keyFromFilename(file.name), duration },
+        buffer, // already decoded; skip the reload
+      )
       onAdded(loop)
       setFile(null)
       setBuffer(null)
@@ -177,7 +180,7 @@ export function Uploader({ onAdded }: Props) {
         disabled={!file || !bpmOk || busy || detecting}
         className="min-h-12 rounded bg-stone-900 px-4 text-white disabled:opacity-40"
       >
-        {busy ? 'Saving…' : 'Add'}
+        {busy ? 'Uploading…' : 'Add'}
       </button>
 
       {error && <p className="text-sm text-red-700">{error}</p>}

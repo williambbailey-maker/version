@@ -11,6 +11,10 @@ export type Loop = {
   kind: LoopKind
   gain: number         // 0..1, default 0.8
   buffer?: AudioBuffer // decoded, in-memory only
+  storagePath?: string // object in bucket "loops"; `url` is a signed URL resolved on demand
+  key?: string | null  // musical key from the filename, e.g. "Cmin"
+  pack?: string | null // Splice pack / parent folder
+  startOffset?: number // seconds to skip at the start of the decoded buffer (codec priming)
 }
 
 export type LoadedLoop = Loop & { buffer: AudioBuffer }

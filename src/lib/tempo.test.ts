@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { bpmFromFilename, candidatesFromDuration, combineEstimates, estimateBPM, tidy } from './tempo'
+import { bpmFromFilename, candidatesFromDuration, combineEstimates, estimateBPM, guessBars, keyFromFilename, tidy } from './tempo'
 
 const SR = 44100
 
@@ -139,5 +139,33 @@ describe('tidy', () => {
     expect(tidy(91.98)).toBe(92)
     expect(tidy(92.04)).toBe(92)
     expect(tidy(92.26)).toBe(92.3)
+  })
+})
+
+describe('guessBars', () => {
+  it('snaps a file length to the nearest power-of-two bar count', () => {
+    expect(guessBars(4.8, 100)).toBe(2)
+    expect(guessBars(2.4, 100)).toBe(1)
+    expect(guessBars(9.6, 100)).toBe(4)
+    expect(guessBars(19.2, 100)).toBe(8)
+    expect(guessBars(5.45, 88)).toBe(2)
+    expect(guessBars(3.5, 100)).toBe(2)
+    expect(guessBars(3.3, 100)).toBe(1)
+    expect(guessBars(40, 100)).toBe(8)
+  })
+})
+
+describe('keyFromFilename', () => {
+  it('reads Splice-style key tokens', () => {
+    expect(keyFromFilename('OS_TFP_128_synth_loop_Cmin.wav')).toBe('Cmin')
+    expect(keyFromFilename('pad_92_F#maj.wav')).toBe('F#maj')
+    expect(keyFromFilename('bass 140 Dbm.wav')).toBe('Dbmin')
+    expect(keyFromFilename('keys-100-Am.wav')).toBe('Amin')
+    expect(keyFromFilename('keys-100-AM.wav')).toBe('Amaj')
+    expect(keyFromFilename('Vocal_Chop_Gminor_120.wav')).toBe('Gmin')
+  })
+  it('ignores bare letters and unrelated words', () => {
+    expect(keyFromFilename('drum loop A.wav')).toBeNull()
+    expect(keyFromFilename('mix_main_120.wav')).toBeNull()
   })
 })
