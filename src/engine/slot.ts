@@ -20,6 +20,8 @@ export class Slot {
   private node: AudioBufferSourceNode | null = null
   private _loop: LoadedLoop | null = null
   private _pending: LoadedLoop | null = null
+  private _gain = 1
+  private gainFor: string | null = null // loop id the remembered gain belongs to
 
   constructor(ctx: BaseAudioContext, kind: LoopKind, destination: AudioNode) {
     this.ctx = ctx
@@ -43,9 +45,28 @@ export class Slot {
     return this.node !== null
   }
 
+  /** Current mix level, 0..1. */
+  get level(): number {
+    return this._gain
+  }
+
+  /** The loop this slot represents, sounding or pending. */
+  get current(): LoadedLoop | null {
+    return this._loop ?? this._pending
+  }
+
   /** Choose a loop while the transport is stopped. */
   setPending(loop: LoadedLoop | null): void {
     this._pending = loop
+    if (loop) this.rememberGain(loop)
+  }
+
+  /** Adopt the loop's stored gain the first time this slot sees it. */
+  private rememberGain(loop: LoadedLoop): void {
+    if (this.gainFor !== loop.id) {
+      this.gainFor = loop.id
+      this._gain = loop.gain
+    }
   }
 
   /**
@@ -72,7 +93,8 @@ export class Slot {
     this.node = node
     this._loop = loop
     this._pending = null
-    this.setGain(loop.gain, at)
+    this.rememberGain(loop)
+    this.setGain(this._gain, at)
   }
 
   /** Bar-quantized replacement. Alias of start(); kept for readability at call sites. */
@@ -86,18 +108,32 @@ export class Slot {
     this.node.playbackRate.setValueAtTime(rate, at)
   }
 
+  /** Stop at `at`; the loop stays pending so play() brings it back. */
   stop(at: number): void {
     this.stopNode(at)
-    this._pending = this._loop
+    this._pending = this._loop ?? this._pending
     this._loop = null
   }
 
-  setGain(value: number, at: number = this.ctx.currentTime): void {
-    // Ramp, never set .value while playing.
-    this.gain.gain.setTargetAtTime(Math.max(0, Math.min(1, value)), at, GAIN_TAU)
+  /** Stop at `at` and release this slot's nodes once the audio has ended. */
+  dispose(at: number): void {
+    const node = this.node
+    this._pending = null
+    this._loop = null
+    if (!node) {
+      this.gain.disconnect()
+      return
+    }
+    this.stopNode(at, () => this.gain.disconnect())
   }
 
-  private stopNode(at: number): void {
+  setGain(value: number, at: number = this.ctx.currentTime): void {
+    this._gain = Math.max(0, Math.min(1, value))
+    // Ramp, never set .value while playing.
+    this.gain.gain.setTargetAtTime(this._gain, at, GAIN_TAU)
+  }
+
+  private stopNode(at: number, onEnded?: () => void): void {
     const node = this.node
     if (!node) return
     this.node = null
@@ -108,6 +144,7 @@ export class Slot {
     }
     node.onended = () => {
       node.disconnect()
+      onEnded?.()
     }
   }
 }

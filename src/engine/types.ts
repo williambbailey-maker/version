@@ -15,6 +15,8 @@ export type Loop = {
   key?: string | null  // musical key from the filename, e.g. "Cmin"
   pack?: string | null // Splice pack / parent folder
   startOffset?: number // seconds to skip at the start of the decoded buffer (codec priming)
+  tags?: string[]
+  bucketId?: string | null
 }
 
 export type LoadedLoop = Loop & { buffer: AudioBuffer }

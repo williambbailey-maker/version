@@ -6,6 +6,7 @@
  *
  *   npm run import -- "~/Splice/sounds/packs" [--originals] [--dry-run]
  *                    [--format mp3|aac] [--bitrate 192k] [--kind drums|sample|auto]
+ *                    [--bucket "Name"] [--tags reggae,guitar]
  *
  * Needs ffmpeg + ffprobe on PATH and SUPABASE_EMAIL / SUPABASE_PASSWORD in
  * the environment (or a .env.local file at the repo root). --dry-run only
@@ -47,13 +48,22 @@ function loadDotEnv(): void {
 }
 
 type Format = 'mp3' | 'aac'
-type Args = { root: string; originals: boolean; dryRun: boolean; format: Format; bitrate: string; kind: LoopKind | 'auto' }
+type Args = {
+  root: string
+  originals: boolean
+  dryRun: boolean
+  format: Format
+  bitrate: string
+  kind: LoopKind | 'auto'
+  bucket: string | null
+  tags: string[]
+}
 
 const PREVIEW_EXT: Record<Format, string> = { mp3: 'mp3', aac: 'm4a' }
 const PREVIEW_MIME: Record<Format, string> = { mp3: 'audio/mpeg', aac: 'audio/mp4' }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { root: '', originals: false, dryRun: false, format: 'mp3', bitrate: '192k', kind: 'auto' }
+  const a: Args = { root: '', originals: false, dryRun: false, format: 'mp3', bitrate: '192k', kind: 'auto', bucket: null, tags: [] }
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i]!
     if (v === '--originals') a.originals = true
@@ -61,11 +71,13 @@ function parseArgs(argv: string[]): Args {
     else if (v === '--format') a.format = (argv[++i] as Format) ?? 'mp3'
     else if (v === '--bitrate') a.bitrate = argv[++i] ?? a.bitrate
     else if (v === '--kind') a.kind = (argv[++i] as Args['kind']) ?? 'auto'
+    else if (v === '--bucket') a.bucket = argv[++i] ?? null
+    else if (v === '--tags') a.tags = (argv[++i] ?? '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
     else if (!a.root) a.root = v
   }
   if (!a.root || !(a.format in PREVIEW_EXT)) {
     console.error(
-      'usage: npm run import -- <folder> [--originals] [--dry-run] [--format mp3|aac] [--bitrate 192k] [--kind auto|drums|sample]',
+      'usage: npm run import -- <folder> [--originals] [--dry-run] [--format mp3|aac] [--bitrate 192k] [--kind auto|drums|sample] [--bucket Name] [--tags a,b]',
     )
     process.exit(2)
   }
@@ -169,6 +181,19 @@ async function main(): Promise<void> {
     }
   }
 
+  // Optional bucket, created on first use.
+  let bucketId: string | null = null
+  if (args.bucket && !args.dryRun) {
+    const found = await supabase.from('buckets').select('id').eq('name', args.bucket).maybeSingle()
+    if (found.error) throw new Error(found.error.message)
+    if (found.data) bucketId = (found.data as { id: string }).id
+    else {
+      const made = await supabase.from('buckets').insert({ name: args.bucket }).select('id').single()
+      if (made.error) throw new Error(made.error.message)
+      bucketId = (made.data as { id: string }).id
+    }
+  }
+
   const files = walk(args.root)
   console.log(`${files.length} audio files under ${args.root}${args.dryRun ? ' (dry run)' : ''}`)
 
@@ -257,6 +282,8 @@ async function main(): Promise<void> {
             key,
             duration,
             size_bytes: statSync(file).size,
+            tags: args.tags,
+            bucket_id: bucketId,
           },
           { onConflict: 'owner,source_path' },
         )

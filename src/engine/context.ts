@@ -26,8 +26,7 @@ export function getContext(): AudioContext {
 }
 
 /** Create/resume inside a user gesture. Resolves once the context is running. */
-export async function ensureRunning(): Promise<AudioContext> {
-  const c = getContext()
+export async function ensureRunning(c: AudioContext = getContext()): Promise<AudioContext> {
   if (c.state !== 'running') {
     await c.resume()
   }

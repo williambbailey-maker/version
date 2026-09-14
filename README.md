@@ -46,7 +46,17 @@ The importer walks the folder, reads bpm and key from Splice filenames (falling
 back to audio analysis), transcodes each file to a small MP3 preview, uploads it
 and registers it. Originals stay on disk; add `--originals` to upload them too.
 Reruns only add new files. Files whose tempo can't be determined are listed at
-the end so you can add them from the app with a bpm.
+the end so you can add them from the app with a bpm. `--bucket "Name"` files
+everything into a bucket (created if needed) and `--tags a,b` tags them, so a
+pack-by-pack import can be organised as it lands.
+
+### Playing, tags, buckets
+
+Tap a drum loop to make it the clock, then tap any number of samples to layer
+them; each enters on the next bar. The mixer under Play has a fader per loop
+(saved to the library) and × takes a sample out on the bar. The ✎ on a row
+edits name, tags and bucket. Search with free text or `#tag`; tag chips toggle
+filters; bucket chips filter by bucket, and "+ New bucket" creates one.
 
 Why previews: the app is for auditioning, your DAW uses the WAV from disk. MP3
 previews are ~8× smaller and decode fast on the phone. The importer also

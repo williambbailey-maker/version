@@ -2,7 +2,7 @@ import { ensureRunning, getContext } from './context'
 import { Loader } from './loader'
 import { Slot } from './slot'
 import { Transport } from './transport'
-import type { LoadedLoop, Loop, LoopKind } from './types'
+import type { LoadedLoop, Loop } from './types'
 import { isPowerOfTwoBars } from './types'
 
 /** Seconds ahead of `currentTime` that a fresh play() starts. */
@@ -13,6 +13,7 @@ const SWAP_MIN_LEAD = 0.02
 export type SlotState = {
   loop: Loop | null    // sounding (or scheduled)
   pending: Loop | null // chosen while stopped
+  gain: number         // current mix level 0..1
 }
 
 export type EngineState = {
@@ -20,7 +21,7 @@ export type EngineState = {
   masterBPM: number
   barSec: number
   drums: SlotState
-  sample: SlotState
+  samples: SlotState[] // one per active sample loop, in the order they were added
   loading: readonly string[] // loop ids currently being fetched/decoded
   error: string | null
 }
@@ -28,8 +29,9 @@ export type EngineState = {
 type Listener = () => void
 
 /**
- * Composes the transport and two slots (drums, sample) behind one API.
- * Drums are the master clock: masterBPM is always the drum loop's bpm.
+ * One drum slot (the master clock) plus any number of sample slots, all
+ * locked to the same transport grid. Selecting a sample toggles it in or
+ * out on the next bar; each slot has its own gain.
  */
 export class Engine {
   readonly ctx: AudioContext
@@ -37,7 +39,8 @@ export class Engine {
   readonly loader: Loader
   readonly master: GainNode
 
-  private slots: Record<LoopKind, Slot>
+  private drums: Slot
+  private samples = new Map<string, Slot>() // keyed by loop id
   private listeners = new Set<Listener>()
   private loading = new Set<string>()
   private error: string | null = null
@@ -52,10 +55,7 @@ export class Engine {
     this.master = ctx.createGain()
     this.master.gain.value = 1
     this.master.connect(ctx.destination)
-    this.slots = {
-      drums: new Slot(ctx, 'drums', this.master),
-      sample: new Slot(ctx, 'sample', this.master),
-    }
+    this.drums = new Slot(ctx, 'drums', this.master)
     this._state = this.snapshot()
   }
 
@@ -79,38 +79,47 @@ export class Engine {
     return this.transport.barIndex(this.ctx.currentTime)
   }
 
+  isActive(loopId: string): boolean {
+    return this.drums.current?.id === loopId || this.samples.has(loopId)
+  }
+
   // ---- actions -----------------------------------------------------------
 
   /**
-   * Choose a loop for its slot (by `loop.kind`). While playing this is a
-   * bar-quantized swap; while stopped it just becomes the slot's pending loop.
+   * Drums: bar-quantized swap (or pending while stopped).
+   * Samples: toggle in or out, bar-quantized while playing.
    */
   async select(loop: Loop): Promise<void> {
     if (!isPowerOfTwoBars(loop.bars)) {
       throw new RangeError(`Loop "${loop.name}" has ${loop.bars} bars; must be 1, 2, 4 or 8`)
     }
-    const slot = this.slots[loop.kind]
-    if (slot.loop?.id === loop.id || slot.pending?.id === loop.id) return
+    if (loop.kind === 'drums') return this.selectDrums(loop)
+    if (this.samples.has(loop.id)) this.removeSample(loop.id)
+    else await this.addSample(loop)
+  }
 
-    const loaded = await this.load(loop)
-    if (!this.playing) {
-      slot.setPending(loaded)
-      if (loop.kind === 'drums') this.transport.setMasterBPM(loaded.bpm)
-      this.emit()
-      return
-    }
+  /** Take a sample out (bar-quantized while playing). No-op if not active. */
+  removeSample(loopId: string): void {
+    const slot = this.samples.get(loopId)
+    if (!slot) return
+    this.samples.delete(loopId)
+    slot.dispose(this.playing ? this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD) : this.ctx.currentTime)
+    this.emit()
+  }
 
-    const at = this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD)
-    if (loop.kind === 'drums') this.swapDrums(loaded, at)
-    else slot.swap(loaded, at, this.transport.rateFor(loaded.bpm))
+  /** Mix level for an active loop (drums or sample), ramped. */
+  setGain(loopId: string, value: number): void {
+    const slot = this.drums.current?.id === loopId ? this.drums : this.samples.get(loopId)
+    if (!slot) return
+    slot.setGain(value)
     this.emit()
   }
 
   /** Start everything, locked to the same timestamp. Call from a user gesture. */
   async play(): Promise<void> {
     if (this.playing) return
-    await ensureRunning()
-    const drums = this.slots.drums.pending
+    await ensureRunning(this.ctx)
+    const drums = this.drums.pending
     if (!drums) throw new Error('Choose a drum loop before pressing play')
 
     // If a quantized stop is still in flight, pick up exactly where it lands.
@@ -120,21 +129,21 @@ export class Engine {
 
     this.transport.setMasterBPM(drums.bpm)
     this.transport.start(at)
-    this.slots.drums.start(drums, at, 1)
-
-    const sample = this.slots.sample.pending
-    if (sample) this.slots.sample.start(sample, at, this.transport.rateFor(sample.bpm))
-
+    this.drums.start(drums, at, 1)
+    for (const slot of this.samples.values()) {
+      const loop = slot.pending
+      if (loop) slot.start(loop, at, this.transport.rateFor(loop.bpm))
+    }
     this.emit()
   }
 
-  /** Bar-quantized stop: audio runs to the end of the current bar. */
+  /** Bar-quantized stop: audio runs to the end of the current bar. Selections are kept. */
   stop(): void {
     if (!this.playing) return
     const at = this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD)
     this.stopAt = at
-    this.slots.drums.stop(at)
-    this.slots.sample.stop(at)
+    this.drums.stop(at)
+    for (const slot of this.samples.values()) slot.stop(at)
     this.transport.stop()
     this.emit()
   }
@@ -149,6 +158,42 @@ export class Engine {
   }
 
   // ---- internals ---------------------------------------------------------
+
+  private async selectDrums(loop: Loop): Promise<void> {
+    if (this.drums.current?.id === loop.id) return
+    const loaded = await this.load(loop)
+    if (!this.playing) {
+      this.drums.setPending(loaded)
+      this.transport.setMasterBPM(loaded.bpm)
+      this.emit()
+      return
+    }
+    const at = this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD)
+    this.drums.swap(loaded, at, 1)
+    if (loaded.bpm !== this.transport.masterBPM) {
+      // Drums define tempo: re-anchor the grid and re-pitch every sample at
+      // the same instant so everything stays locked.
+      this.transport.setMasterBPM(loaded.bpm, at)
+      for (const slot of this.samples.values()) {
+        const s = slot.loop
+        if (s) slot.setRate(this.transport.rateFor(s.bpm), at)
+      }
+    }
+    this.emit()
+  }
+
+  private async addSample(loop: Loop): Promise<void> {
+    const loaded = await this.load(loop)
+    if (this.samples.has(loop.id)) return // toggled twice while loading
+    const slot = new Slot(this.ctx, 'sample', this.master)
+    this.samples.set(loop.id, slot)
+    if (this.playing) {
+      slot.start(loaded, this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD), this.transport.rateFor(loaded.bpm))
+    } else {
+      slot.setPending(loaded)
+    }
+    this.emit()
+  }
 
   private async load(loop: Loop): Promise<LoadedLoop> {
     this.loading.add(loop.id)
@@ -165,28 +210,14 @@ export class Engine {
     }
   }
 
-  /**
-   * Drums define tempo, so a drum swap may change masterBPM. The grid is
-   * re-anchored at the swap boundary and the sample slot is re-pitched at
-   * the same instant so the two stay locked.
-   */
-  private swapDrums(loaded: LoadedLoop, at: number): void {
-    this.slots.drums.swap(loaded, at, 1)
-    if (loaded.bpm !== this.transport.masterBPM) {
-      this.transport.setMasterBPM(loaded.bpm, at)
-      const sample = this.slots.sample.loop
-      if (sample) this.slots.sample.setRate(this.transport.rateFor(sample.bpm), at)
-    }
-  }
-
   private snapshot(): EngineState {
-    const s = (slot: Slot): SlotState => ({ loop: slot.loop, pending: slot.pending })
+    const s = (slot: Slot): SlotState => ({ loop: slot.loop, pending: slot.pending, gain: slot.level })
     return {
       playing: this.playing,
       masterBPM: this.transport.masterBPM,
       barSec: this.transport.barSec,
-      drums: s(this.slots.drums),
-      sample: s(this.slots.sample),
+      drums: s(this.drums),
+      samples: [...this.samples.values()].map(s),
       loading: [...this.loading],
       error: this.error,
     }
