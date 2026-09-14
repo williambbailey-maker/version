@@ -88,20 +88,6 @@ export async function removeLocalLoop(id: string): Promise<void> {
   }
 }
 
-/** Duration of an audio file in seconds, via a throwaway <audio> element. */
-export function audioDuration(file: Blob): Promise<number | null> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file)
-    const a = new Audio()
-    const done = (v: number | null) => {
-      URL.revokeObjectURL(url)
-      resolve(v)
-    }
-    a.onloadedmetadata = () => done(Number.isFinite(a.duration) ? a.duration : null)
-    a.onerror = () => done(null)
-    a.src = url
-  })
-}
 
 /** Nearest power-of-two bar count for a file of `seconds` at `bpm`. */
 export function guessBars(seconds: number, bpm: number): Bars {
