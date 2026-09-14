@@ -1,5 +1,4 @@
 import type { Bars } from '../engine/types'
-import { guessBars } from './localLibrary'
 
 /**
  * Tempo + bar-count estimation for uploaded loops.
@@ -24,6 +23,36 @@ export type TempoEstimate = {
 
 const MIN_BPM = 50
 const MAX_BPM = 220
+
+/** Nearest power-of-two bar count for a file of `seconds` at `bpm`. */
+export function guessBars(seconds: number, bpm: number): Bars {
+  const bars = (seconds * bpm) / 240
+  let best: Bars = 1
+  for (const b of [1, 2, 4, 8] as const) {
+    if (Math.abs(Math.log2(bars) - Math.log2(b)) < Math.abs(Math.log2(bars) - Math.log2(best))) best = b
+  }
+  return best
+}
+
+/**
+ * Musical key from a filename token: "Cmin", "C#maj", "Dbm", "Amin", "F#M".
+ * Normalised to "<Note><#|b>?<maj|min>". Bare note letters are ignored
+ * (too ambiguous). Null if nothing matches.
+ */
+export function keyFromFilename(name: string): string | null {
+  const base = name.replace(/\.[^.]+$/, '')
+  const tokens = base.split(/[\s_\-.()\[\]]+/)
+  for (const t of tokens) {
+    const m = t.match(/^([A-Ga-g])(#|b)?(maj|min|major|minor|m|M)$/)
+    if (!m) continue
+    const note = m[1]!.toUpperCase()
+    const acc = m[2] ?? ''
+    const q = m[3]!
+    const mode = q === 'm' || q.toLowerCase() === 'min' || q.toLowerCase() === 'minor' ? 'min' : 'maj'
+    return `${note}${acc}${mode}`
+  }
+  return null
+}
 
 // ---- 1. filename ----------------------------------------------------------
 

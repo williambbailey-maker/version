@@ -59,13 +59,15 @@ export class Slot {
     const node = this.ctx.createBufferSource()
     node.buffer = loop.buffer
     node.loop = true
-    node.loopStart = 0
+    // Compressed previews carry encoder priming at the start; skip it.
+    const offset = Math.max(0, loop.startOffset ?? 0)
+    node.loopStart = offset
     // Trust bpm + bars over the file's duration (exports may not be trimmed
     // exactly to the bar). Never exceed the buffer though.
-    node.loopEnd = Math.min(loopLengthSec(loop), loop.buffer.duration)
+    node.loopEnd = Math.min(offset + loopLengthSec(loop), loop.buffer.duration)
     node.playbackRate.value = rate
     node.connect(this.gain)
-    node.start(at)
+    node.start(at, offset)
 
     this.node = node
     this._loop = loop
