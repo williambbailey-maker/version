@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Library } from './components/Library'
 import { Login } from './components/Login'
+import { SetPassword } from './components/SetPassword'
 import { Uploader } from './components/Uploader'
 import { useEngine } from './hooks/useEngine'
 import { useSession } from './hooks/useSession'
@@ -11,9 +12,10 @@ import { supabase } from './lib/supabase'
 import type { Loop, LoopKind } from './engine/types'
 
 export default function App() {
-  const session = useSession()
+  const { session, recovering, finishRecovery } = useSession()
   if (session === undefined) return null
   if (!session) return <Login />
+  if (recovering) return <SetPassword onDone={finishRecovery} />
   return <Studio />
 }
 

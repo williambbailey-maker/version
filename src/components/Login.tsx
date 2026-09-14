@@ -28,6 +28,14 @@ export function Login() {
     })
   }
 
+  const forgot = () => {
+    void run(async () => {
+      if (!email) return 'Enter your email first, then tap Forgot password.'
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
+      return error ? error.message : 'Reset link sent. Open it on this device to choose a new password.'
+    })
+  }
+
   const signUp = () => {
     void run(async () => {
       const { data, error } = await supabase.auth.signUp({ email, password })
@@ -59,7 +67,7 @@ export function Login() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="rounded border border-stone-300 px-3 py-3"
-            required
+            required={false}
             minLength={6}
           />
         </label>
@@ -73,6 +81,9 @@ export function Login() {
           className="min-h-12 rounded border border-stone-400 text-stone-700 disabled:opacity-40"
         >
           Create account
+        </button>
+        <button type="button" onClick={forgot} disabled={busy} className="text-sm text-stone-500 underline">
+          Forgot password?
         </button>
       </form>
       {msg && <p className="text-sm text-stone-700">{msg}</p>}

@@ -2,13 +2,24 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
-/** Current auth session; `undefined` while loading, `null` when signed out. */
-export function useSession(): Session | null | undefined {
+export type AuthState = {
+  /** `undefined` while loading, `null` when signed out. */
+  session: Session | null | undefined
+  /** True after arriving via a password-reset link; the user must set a new password. */
+  recovering: boolean
+  finishRecovery: () => void
+}
+
+export function useSession(): AuthState {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
+  const [recovering, setRecovering] = useState(false)
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_evt, s) => setSession(s))
+    const { data } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s)
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+    })
     return () => data.subscription.unsubscribe()
   }, [])
-  return session
+  return { session, recovering, finishRecovery: () => setRecovering(false) }
 }
