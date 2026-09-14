@@ -2,11 +2,13 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { getContext } from '../engine/context'
 import type { Bars, Loop, LoopKind } from '../engine/types'
-import { uploadLoop } from '../lib/loops'
+import { parseTagInput, uploadLoop } from '../lib/loops'
+import type { Bucket } from '../lib/loops'
 import { estimateLoop, guessBars, keyFromFilename } from '../lib/tempo'
 import type { TempoSource } from '../lib/tempo'
 
 type Props = {
+  buckets: Bucket[]
   onAdded: (loop: Loop) => void
 }
 
@@ -21,7 +23,7 @@ const SOURCE_LABEL: Record<TempoSource, string> = {
 }
 
 /** Bare-bones add-a-loop form: detects bpm + bars, uploads the file as-is to Supabase. */
-export function Uploader({ onAdded }: Props) {
+export function Uploader({ buckets, onAdded }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null)
   const [name, setName] = useState('')
@@ -30,6 +32,8 @@ export function Uploader({ onAdded }: Props) {
   const [bars, setBars] = useState<Bars>(2)
   const [barsTouched, setBarsTouched] = useState(false)
   const [kind, setKind] = useState<LoopKind>('sample')
+  const [tags, setTags] = useState('')
+  const [bucketId, setBucketId] = useState('')
   const [detecting, setDetecting] = useState(false)
   const [detected, setDetected] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -84,7 +88,16 @@ export function Uploader({ onAdded }: Props) {
     try {
       const loop = await uploadLoop(
         file,
-        { name: name.trim() || file.name, bpm: bpmNum, bars, kind, key: keyFromFilename(file.name), duration },
+        {
+          name: name.trim() || file.name,
+          bpm: bpmNum,
+          bars,
+          kind,
+          key: keyFromFilename(file.name),
+          duration,
+          tags: parseTagInput(tags),
+          bucketId: bucketId || null,
+        },
         buffer, // already decoded; skip the reload
       )
       onAdded(loop)
@@ -163,6 +176,30 @@ export function Uploader({ onAdded }: Props) {
           >
             <option value="drums">drums</option>
             <option value="sample">sample</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Tags
+          <input
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="reggae, guitar"
+            className="rounded border border-stone-300 px-2 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Bucket
+          <select
+            value={bucketId}
+            onChange={(e) => setBucketId(e.target.value)}
+            className="rounded border border-stone-300 px-2 py-2"
+          >
+            <option value="">Unsorted</option>
+            {buckets.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
           </select>
         </label>
       </div>

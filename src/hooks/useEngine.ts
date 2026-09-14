@@ -12,6 +12,9 @@ export function useEngine(): EngineState & {
   stop: () => void
   toggle: () => Promise<void>
   select: (loop: Loop) => Promise<void>
+  removeSample: (loopId: string) => void
+  setGain: (loopId: string, value: number) => void
+  isActive: (loopId: string) => boolean
 } {
   const engine = useMemo(() => getEngine(), [])
   const subscribe = useCallback((fn: () => void) => engine.subscribe(fn), [engine])
@@ -21,6 +24,9 @@ export function useEngine(): EngineState & {
   const stop = useCallback(() => engine.stop(), [engine])
   const toggle = useCallback(() => engine.toggle(), [engine])
   const select = useCallback((loop: Loop) => engine.select(loop), [engine])
+  const removeSample = useCallback((id: string) => engine.removeSample(id), [engine])
+  const setGain = useCallback((id: string, v: number) => engine.setGain(id, v), [engine])
+  const isActive = useCallback((id: string) => engine.isActive(id), [engine])
 
-  return { ...state, play, stop, toggle, select }
+  return { ...state, play, stop, toggle, select, removeSample, setGain, isActive }
 }

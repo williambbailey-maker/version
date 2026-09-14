@@ -14,8 +14,14 @@ type LoopRow = {
   key: string | null
   gain: number | string
   duration: number | string | null
+  tags: string[] | null
+  bucket_id: string | null
   created_at: string
 }
+
+export type Bucket = { id: string; name: string }
+
+const LOOP_COLUMNS = 'id,name,storage_path,original_path,pack,bpm,bars,kind,key,gain,duration,tags,bucket_id,created_at'
 
 function fromRow(r: LoopRow): Loop {
   return {
@@ -29,6 +35,8 @@ function fromRow(r: LoopRow): Loop {
     storagePath: r.storage_path,
     key: r.key,
     pack: r.pack,
+    tags: r.tags ?? [],
+    bucketId: r.bucket_id,
   }
 }
 
@@ -41,10 +49,61 @@ export async function currentUserId(): Promise<string> {
 export async function listLoops(): Promise<Loop[]> {
   const { data, error } = await supabase
     .from('loops')
-    .select('id,name,storage_path,original_path,pack,bpm,bars,kind,key,gain,duration,created_at')
+    .select(LOOP_COLUMNS)
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
   return (data as LoopRow[]).map(fromRow)
+}
+
+// ---- buckets ----------------------------------------------------------------
+
+export async function listBuckets(): Promise<Bucket[]> {
+  const { data, error } = await supabase.from('buckets').select('id,name').order('name')
+  if (error) throw new Error(error.message)
+  return data as Bucket[]
+}
+
+export async function createBucket(name: string): Promise<Bucket> {
+  const { data, error } = await supabase.from('buckets').insert({ name: name.trim() }).select('id,name').single()
+  if (error) throw new Error(error.message)
+  return data as Bucket
+}
+
+/** Deletes the bucket; its loops become unsorted (bucket_id null). */
+export async function deleteBucket(id: string): Promise<void> {
+  const { error } = await supabase.from('buckets').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ---- edits ------------------------------------------------------------------
+
+export type LoopPatch = Partial<Pick<Loop, 'name' | 'tags' | 'bucketId' | 'gain' | 'bpm' | 'bars' | 'kind'>>
+
+export async function updateLoop(id: string, patch: LoopPatch): Promise<void> {
+  const row: Record<string, unknown> = {}
+  if (patch.name !== undefined) row.name = patch.name
+  if (patch.tags !== undefined) row.tags = normalizeTags(patch.tags)
+  if (patch.bucketId !== undefined) row.bucket_id = patch.bucketId
+  if (patch.gain !== undefined) row.gain = patch.gain
+  if (patch.bpm !== undefined) row.bpm = patch.bpm
+  if (patch.bars !== undefined) row.bars = patch.bars
+  if (patch.kind !== undefined) row.kind = patch.kind
+  const { error } = await supabase.from('loops').update(row).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/** Lower-case, trimmed, de-duplicated, no leading '#'. */
+export function normalizeTags(tags: readonly string[]): string[] {
+  const out: string[] = []
+  for (const t of tags) {
+    const v = t.trim().replace(/^#/, '').toLowerCase()
+    if (v && !out.includes(v)) out.push(v)
+  }
+  return out
+}
+
+export function parseTagInput(text: string): string[] {
+  return normalizeTags(text.split(/[,\s]+/))
 }
 
 // ---- signed URLs ------------------------------------------------------------
@@ -86,6 +145,8 @@ export type NewLoopMeta = {
   kind: LoopKind
   key?: string | null
   duration?: number | null
+  tags?: string[]
+  bucketId?: string | null
 }
 
 const EXT_MIME: Record<string, string> = {
@@ -120,8 +181,10 @@ export async function uploadLoop(file: File, meta: NewLoopMeta, buffer?: AudioBu
     key: meta.key ?? null,
     duration: meta.duration ?? buffer?.duration ?? null,
     size_bytes: file.size,
+    tags: normalizeTags(meta.tags ?? []),
+    bucket_id: meta.bucketId ?? null,
   }
-  const ins = await supabase.from('loops').insert(row).select('*').single()
+  const ins = await supabase.from('loops').insert(row).select(LOOP_COLUMNS).single()
   if (ins.error) {
     await supabase.storage.from(BUCKET).remove([path])
     throw new Error(`Could not save loop: ${ins.error.message}`)
