@@ -30,3 +30,17 @@ src/hooks/     useEngine() — the only React ↔ engine bridge
 src/lib/       data (dev loops now, Supabase later)
 src/components/ UI
 ```
+
+## Deploy (Vercel)
+
+The repo is Vercel-ready: `vercel.json` sets the Vite framework preset, an
+SPA rewrite, and cache headers; `public/manifest.webmanifest` plus the meta
+tags in `index.html` make it installable from Safari's "Add to Home Screen".
+
+1. Go to https://vercel.com/new and import `williambbailey-maker/version`.
+2. Accept the detected settings (Framework: Vite, build `npm run build`,
+   output `dist`). No environment variables are needed for phase 1.
+3. Deploy. Production tracks `main`; every other branch gets a preview URL.
+
+No service worker yet, so the app needs a network connection to load. That
+can come once the Supabase library is in place.
