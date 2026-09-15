@@ -49,7 +49,11 @@ remain your own collections, separate from packs.
 ### Bulk import from the browser (nothing to install)
 
 **Add loop → Many loops** in the app. Choose a folder (desktop browsers) or a
-batch of files, set an optional bucket, tags and kind, and press Import. Each
+batch of files. By default the folder is **one pack**: its name is prefilled
+from the folder, sub-folders become categories, and a pack link (Splice, a
+shop page) can be read with **Fetch info** to fill publisher, description,
+cover art and genres. Switch to "One pack per sub-folder" for a folder of
+packs. Set an optional bucket, tags and kind, and press Import. Each
 file is decoded in the browser, its tempo detected, encoded to an MP3 preview
 in a Web Worker, uploaded and registered. Files already imported (by relative
 path) are skipped, so re-importing a folder only adds new ones. Files with no

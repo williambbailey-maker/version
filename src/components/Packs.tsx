@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import type { Pack, PackPatch } from '../lib/loops'
 import { parseTagInput } from '../lib/loops'
 import type { PackStats } from '../lib/packs'
+import { fetchPackInfo } from '../lib/packinfo'
 
 type Props = {
   packs: Pack[]
@@ -114,7 +115,25 @@ function PackEditor({ pack, onSave, onCancel }: { pack: Pack; onSave: (patch: Pa
   const [description, setDescription] = useState(pack.description ?? '')
   const [notes, setNotes] = useState(pack.notes ?? '')
   const [busy, setBusy] = useState(false)
+  const [fetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const fetchInfo = async () => {
+    setFetching(true)
+    setError(null)
+    try {
+      const info = await fetchPackInfo(url)
+      if (info.publisher && !publisher) setPublisher(info.publisher)
+      if (info.description && !description) setDescription(info.description)
+      if (info.image && !coverUrl) setCoverUrl(info.image)
+      if (info.genres.length && !genres) setGenres(info.genres.join(', '))
+      setUrl(info.url)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setFetching(false)
+    }
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -148,7 +167,12 @@ function PackEditor({ pack, onSave, onCancel }: { pack: Pack; onSave: (patch: Pa
     <form onSubmit={submit} className="grid grid-cols-1 gap-4 border-t border-line py-4 md:grid-cols-2">
       {field('Name', name, setName)}
       {field('Publisher / label', publisher, setPublisher, 'e.g. Splice, Loopmasters, an artist')}
-      {field('Link', url, setUrl, 'https://…')}
+      <div className="flex items-end gap-2">
+        <div className="flex-1">{field('Link', url, setUrl, 'https://…')}</div>
+        <button type="button" onClick={() => void fetchInfo()} disabled={fetching || !url.trim()} className="pill pill-outline mb-1">
+          {fetching ? 'Reading…' : 'Fetch info'}
+        </button>
+      </div>
       {field('Cover image URL', coverUrl, setCoverUrl, 'https://…jpg')}
       {field('Genres', genres, setGenres, 'reggae, dub')}
       <label className="mono-label flex flex-col gap-1 text-muted md:col-span-2">

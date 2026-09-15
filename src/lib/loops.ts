@@ -100,12 +100,33 @@ export async function updatePack(id: string, patch: PackPatch): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-/** Find or create a pack by name; returns its id. */
-export async function ensurePack(name: string): Promise<string> {
-  const found = await supabase.from('packs').select('id').eq('name', name).maybeSingle()
+/**
+ * Find or create a pack by name; returns its id. Optional info fills in
+ * blanks on an existing pack (never overwrites what's already set).
+ */
+export async function ensurePack(name: string, info?: PackPatch): Promise<string> {
+  const found = await supabase.from('packs').select(PACK_COLUMNS).eq('name', name).maybeSingle()
   if (found.error) throw new Error(found.error.message)
-  if (found.data) return (found.data as { id: string }).id
-  const made = await supabase.from('packs').insert({ name }).select('id').single()
+  if (found.data) {
+    const existing = packFromRow(found.data as PackRow)
+    if (info) {
+      const fill: PackPatch = {}
+      if (!existing.publisher && info.publisher) fill.publisher = info.publisher
+      if (!existing.description && info.description) fill.description = info.description
+      if (!existing.url && info.url) fill.url = info.url
+      if (!existing.coverUrl && info.coverUrl) fill.coverUrl = info.coverUrl
+      if (existing.genres.length === 0 && info.genres && info.genres.length) fill.genres = info.genres
+      if (Object.keys(fill).length) await updatePack(existing.id, fill)
+    }
+    return existing.id
+  }
+  const row: Record<string, unknown> = { name }
+  if (info?.publisher) row.publisher = info.publisher
+  if (info?.description) row.description = info.description
+  if (info?.url) row.url = info.url
+  if (info?.coverUrl) row.cover_url = info.coverUrl
+  if (info?.genres?.length) row.genres = normalizeTags(info.genres)
+  const made = await supabase.from('packs').insert(row).select('id').single()
   if (made.error) throw new Error(made.error.message)
   return (made.data as { id: string }).id
 }

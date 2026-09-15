@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import type { LoopKind } from '../engine/types'
-import { makeItems, runBulkImport } from '../lib/bulk'
+import { makeItems, rootFolderName, runBulkImport } from '../lib/bulk'
 import type { BulkItem, BulkOptions } from '../lib/bulk'
-import type { Bucket } from '../lib/loops'
+import type { Bucket, PackPatch } from '../lib/loops'
 import { parseTagInput } from '../lib/loops'
+import { fetchPackInfo } from '../lib/packinfo'
 
 type Props = {
   buckets: Bucket[]
@@ -28,6 +29,11 @@ export function BulkImport({ buckets, onDone }: Props) {
   const [tags, setTags] = useState('')
   const [kind, setKind] = useState<LoopKind | 'auto'>('auto')
   const [originals, setOriginals] = useState(false)
+  const [packMode, setPackMode] = useState<'one' | 'folders'>('one')
+  const [packName, setPackName] = useState('')
+  const [packUrl, setPackUrl] = useState('')
+  const [packInfo, setPackInfo] = useState<PackPatch | null>(null)
+  const [fetching, setFetching] = useState(false)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const stop = useRef(false)
@@ -35,7 +41,24 @@ export function BulkImport({ buckets, onDone }: Props) {
   const pick = (files: FileList | null) => {
     if (!files) return
     setItems(makeItems(files))
+    const root = rootFolderName(files)
+    if (root && !packName) setPackName(root)
     setError(null)
+  }
+
+  const fetchInfo = async () => {
+    if (!packUrl.trim()) return
+    setFetching(true)
+    setError(null)
+    try {
+      const info = await fetchPackInfo(packUrl)
+      setPackInfo({ publisher: info.publisher, description: info.description, coverUrl: info.image, genres: info.genres, url: info.url })
+      if (info.title && !packName) setPackName(info.title)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setFetching(false)
+    }
   }
 
   const setBpm = (id: number, v: string) => {
@@ -47,7 +70,21 @@ export function BulkImport({ buckets, onDone }: Props) {
     stop.current = false
     setRunning(true)
     setError(null)
-    const opts: BulkOptions = { bucketId: bucketId || null, tags: parseTagInput(tags), kind, originals }
+    const name = packName.trim()
+    if (packMode === 'one' && !name) {
+      setError('Give the pack a name first.')
+      setRunning(false)
+      return
+    }
+    const opts: BulkOptions = {
+      bucketId: bucketId || null,
+      tags: parseTagInput(tags),
+      kind,
+      originals,
+      packMode,
+      packName: packMode === 'one' ? name : null,
+      packInfo: packMode === 'one' ? { ...(packInfo ?? {}), url: packInfo?.url ?? (packUrl.trim() || null) } : null,
+    }
     const work = items.map((it) => ({ ...it, status: it.status === 'notempo' && it.bpm === null ? 'notempo' : it.status === 'done' || it.status === 'skipped' ? it.status : 'queued' })) as BulkItem[]
     setItems(work)
     try {
@@ -88,6 +125,44 @@ export function BulkImport({ buckets, onDone }: Props) {
           />
           Choose a folder
         </label>
+      </div>
+
+      <div className="flex flex-col gap-3 border border-line p-4">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setPackMode('one')} className={['pill', packMode === 'one' ? '' : 'pill-outline'].join(' ')} disabled={running}>
+            This folder is one pack
+          </button>
+          <button type="button" onClick={() => setPackMode('folders')} className={['pill', packMode === 'folders' ? '' : 'pill-outline'].join(' ')} disabled={running}>
+            One pack per sub-folder
+          </button>
+        </div>
+        {packMode === 'one' ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
+            <label className="mono-label flex flex-col gap-1 text-muted">
+              Pack name
+              <input value={packName} onChange={(e) => setPackName(e.target.value)} placeholder="From the folder name" className="field text-ink" disabled={running} />
+            </label>
+            <label className="mono-label flex flex-col gap-1 text-muted">
+              Pack link (Splice, shop page…)
+              <input value={packUrl} onChange={(e) => setPackUrl(e.target.value)} placeholder="https://…" className="field text-ink" disabled={running} />
+            </label>
+            <button type="button" onClick={() => void fetchInfo()} disabled={fetching || running || !packUrl.trim()} className="pill pill-outline self-end">
+              {fetching ? 'Reading…' : 'Fetch info'}
+            </button>
+            {packInfo && (
+              <div className="flex gap-4 md:col-span-3">
+                {packInfo.coverUrl && <img src={packInfo.coverUrl} alt="" className="grain h-20 w-20 object-cover" />}
+                <div className="mono-label flex flex-col gap-1 text-muted">
+                  {packInfo.publisher && <span className="text-ink">{packInfo.publisher}</span>}
+                  {packInfo.genres && packInfo.genres.length > 0 && <span>{packInfo.genres.join(' · ')}</span>}
+                  {packInfo.description && <span className="line-clamp-3 normal-case tracking-normal">{packInfo.description}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="mono-label text-muted">Each first-level folder becomes a pack; deeper folders become categories.</p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
