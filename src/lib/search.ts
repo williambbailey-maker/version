@@ -14,11 +14,14 @@ export function parseQuery(q: string): Query {
   return { text: words.join(' '), tags }
 }
 
-export function matches(loop: Loop, q: Query): boolean {
+/** Extra searchable text per loop, e.g. its pack's publisher and genres. */
+export type Extra = (loop: Loop) => string
+
+export function matches(loop: Loop, q: Query, extra?: Extra): boolean {
   const tags = loop.tags ?? []
   for (const t of q.tags) if (!tags.includes(t)) return false
   if (!q.text) return true
-  const hay = `${loop.name} ${loop.pack ?? ''} ${loop.key ?? ''} ${loop.bpm} ${tags.join(' ')}`.toLowerCase()
+  const hay = `${loop.name} ${loop.pack ?? ''} ${loop.category ?? ''} ${loop.key ?? ''} ${loop.bpm} ${tags.join(' ')} ${extra?.(loop) ?? ''}`.toLowerCase()
   return hay.includes(q.text)
 }
 

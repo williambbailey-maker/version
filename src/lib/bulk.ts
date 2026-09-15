@@ -1,7 +1,8 @@
 import { getContext } from '../engine/context'
 import type { Bars, LoopKind } from '../engine/types'
 import { WEB_MP3, encodeClick, encodeMp3 } from './encode'
-import { existingSourcePaths, uploadBlob, uploadCalibration } from './loops'
+import { ensurePack, existingSourcePaths, uploadBlob, uploadCalibration } from './loops'
+import { packFromPath } from './packs'
 import { estimateLoop, guessBars, keyFromFilename } from './tempo'
 import type { TempoSource } from './tempo'
 
@@ -12,6 +13,7 @@ export type BulkItem = {
   file: File
   relPath: string
   pack: string | null
+  category: string | null
   status: ItemStatus
   bpm: number | null
   bars: Bars
@@ -35,10 +37,14 @@ export function makeItems(files: FileList | File[]): BulkItem[] {
   let id = 0
   for (const file of Array.from(files)) {
     if (!/\.(wav|aif|aiff|flac|mp3|m4a)$/i.test(file.name)) continue
-    const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
-    const parts = rel.split('/')
-    const pack = parts.length >= 2 ? parts[parts.length - 2]! : null
-    out.push({ id: id++, file, relPath: rel, pack, status: 'queued', bpm: null, bars: 2, kind: 'sample', key: null, source: null, error: null })
+    // A picked folder's own name is the first segment of webkitRelativePath;
+    // strip it so paths are relative to the import root, like the CLI.
+    const full = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
+    const segs = full.split('/')
+    const rootName = segs.length >= 2 ? segs[0]! : null
+    const rel = segs.length >= 2 ? segs.slice(1).join('/') : full
+    const { pack, category } = packFromPath(rel, rootName)
+    out.push({ id: id++, file, relPath: rel, pack, category, status: 'queued', bpm: null, bars: 2, kind: 'sample', key: null, source: null, error: null })
   }
   return out
 }
@@ -56,6 +62,16 @@ export async function runBulkImport(
 ): Promise<void> {
   const existing = await existingSourcePaths()
   let calibrated = opts.originals
+  const packIds = new Map<string, string>()
+  const packId = async (name: string | null): Promise<string | null> => {
+    if (!name) return null
+    let id = packIds.get(name)
+    if (!id) {
+      id = await ensurePack(name)
+      packIds.set(name, id)
+    }
+    return id
+  }
 
   for (const item of items) {
     if (shouldStop()) return
@@ -114,6 +130,8 @@ export async function runBulkImport(
         bucketId: opts.bucketId,
         sourcePath: item.relPath,
         pack: item.pack,
+        packId: await packId(item.pack),
+        category: item.category,
       })
       item.status = 'done'
     } catch (e) {

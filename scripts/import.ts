@@ -6,7 +6,13 @@
  *
  *   npm run import -- "~/Splice/sounds/packs" [--originals] [--dry-run]
  *                    [--format mp3|aac] [--bitrate 192k] [--kind drums|sample|auto]
- *                    [--bucket "Name"] [--tags reggae,guitar]
+ *                    [--bucket "Name"] [--tags reggae,guitar] [--packs packs.json]
+ *
+ * Packs: the first folder under <folder> is the pack ("<folder>/<Pack>/..."),
+ * deeper folders become the loop's category. Importing a single pack folder
+ * directly uses that folder's name. --packs points at a JSON array of
+ * { name, publisher, description, url, cover_url, genres } to fill in pack
+ * info (matched by name, created if missing); see scripts/packs.example.json.
  *
  * Needs ffmpeg + ffprobe on PATH and SUPABASE_EMAIL / SUPABASE_PASSWORD in
  * the environment (or a .env.local file at the repo root). --dry-run only
@@ -23,9 +29,10 @@ import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir, homedir } from 'node:os'
-import { basename, dirname, extname, join, relative, resolve } from 'node:path'
+import { basename, extname, join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { combineEstimates, estimateBPM, bpmFromFilename, keyFromFilename } from '../src/lib/tempo'
+import { packFromPath } from '../src/lib/packs'
 import type { Bars, LoopKind } from '../src/engine/types'
 
 const exec = promisify(execFile)
@@ -57,13 +64,14 @@ type Args = {
   kind: LoopKind | 'auto'
   bucket: string | null
   tags: string[]
+  packsFile: string | null
 }
 
 const PREVIEW_EXT: Record<Format, string> = { mp3: 'mp3', aac: 'm4a' }
 const PREVIEW_MIME: Record<Format, string> = { mp3: 'audio/mpeg', aac: 'audio/mp4' }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { root: '', originals: false, dryRun: false, format: 'mp3', bitrate: '192k', kind: 'auto', bucket: null, tags: [] }
+  const a: Args = { root: '', originals: false, dryRun: false, format: 'mp3', bitrate: '192k', kind: 'auto', bucket: null, tags: [], packsFile: null }
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i]!
     if (v === '--originals') a.originals = true
@@ -73,11 +81,12 @@ function parseArgs(argv: string[]): Args {
     else if (v === '--kind') a.kind = (argv[++i] as Args['kind']) ?? 'auto'
     else if (v === '--bucket') a.bucket = argv[++i] ?? null
     else if (v === '--tags') a.tags = (argv[++i] ?? '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
+    else if (v === '--packs') a.packsFile = argv[++i] ?? null
     else if (!a.root) a.root = v
   }
   if (!a.root || !(a.format in PREVIEW_EXT)) {
     console.error(
-      'usage: npm run import -- <folder> [--originals] [--dry-run] [--format mp3|aac] [--bitrate 192k] [--kind auto|drums|sample] [--bucket Name] [--tags a,b]',
+      'usage: npm run import -- <folder> [--originals] [--dry-run] [--format mp3|aac] [--bitrate 192k] [--kind auto|drums|sample] [--bucket Name] [--tags a,b] [--packs packs.json]',
     )
     process.exit(2)
   }
@@ -194,7 +203,41 @@ async function main(): Promise<void> {
     }
   }
 
+  // Pack info file: upsert metadata by name.
+  type PackInfo = { name: string; publisher?: string; description?: string; url?: string; cover_url?: string; genres?: string[]; notes?: string }
+  const packInfo = new Map<string, PackInfo>()
+  if (args.packsFile) {
+    const list = JSON.parse(readFileSync(resolve(args.packsFile), 'utf8')) as PackInfo[]
+    for (const p of list) if (p.name) packInfo.set(p.name, p)
+    console.log(`${packInfo.size} pack entries in ${args.packsFile}`)
+  }
+
+  const packIds = new Map<string, string>()
+  async function packIdFor(name: string | null): Promise<string | null> {
+    if (!name || args.dryRun) return null
+    const cached = packIds.get(name)
+    if (cached) return cached
+    const info = packInfo.get(name)
+    const row: Record<string, unknown> = { name }
+    if (info) {
+      if (info.publisher !== undefined) row.publisher = info.publisher
+      if (info.description !== undefined) row.description = info.description
+      if (info.url !== undefined) row.url = info.url
+      if (info.cover_url !== undefined) row.cover_url = info.cover_url
+      if (info.genres !== undefined) row.genres = info.genres.map((g) => g.trim().toLowerCase()).filter(Boolean)
+      if (info.notes !== undefined) row.notes = info.notes
+    }
+    const up = await supabase.from('packs').upsert(row, { onConflict: 'owner,name' }).select('id').single()
+    if (up.error) throw new Error(`pack "${name}": ${up.error.message}`)
+    const id = (up.data as { id: string }).id
+    packIds.set(name, id)
+    return id
+  }
+  // Apply info for packs listed in the file even if no new files arrive.
+  for (const name of packInfo.keys()) await packIdFor(name)
+
   const files = walk(args.root)
+  const rootName = basename(args.root)
   console.log(`${files.length} audio files under ${args.root}${args.dryRun ? ' (dry run)' : ''}`)
 
   const tmp = mkdtempSync(join(tmpdir(), 'loop-lab-'))
@@ -222,7 +265,7 @@ async function main(): Promise<void> {
         continue
       }
       const name = basename(file, extname(file))
-      const pack = basename(dirname(file))
+      const { pack, category } = packFromPath(sourcePath, rootName)
 
       const duration = await probeDuration(file)
       const filenameBPM = bpmFromFilename(name)
@@ -241,7 +284,7 @@ async function main(): Promise<void> {
         args.kind !== 'auto' ? args.kind : /drum|beat|break|perc|kick|top/i.test(sourcePath) ? 'drums' : 'sample'
       const key = keyFromFilename(name)
 
-      const line = `${sourcePath}  →  ${est.bpm} bpm · ${est.bars} bars · ${kind}${key ? ' · ' + key : ''}  (${est.source})`
+      const line = `${sourcePath}  →  ${est.bpm} bpm · ${est.bars} bars · ${kind}${key ? ' · ' + key : ''}  [${pack ?? '-'}${category ? ' / ' + category : ''}]  (${est.source})`
       if (args.dryRun) {
         console.log(line)
         summary.added++
@@ -276,6 +319,8 @@ async function main(): Promise<void> {
             original_path: originalPath,
             source_path: sourcePath,
             pack,
+            pack_id: await packIdFor(pack),
+            category,
             bpm: est.bpm,
             bars: est.bars as Bars,
             kind,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Library } from './components/Library'
 import { BulkImport } from './components/BulkImport'
 import { Login } from './components/Login'
@@ -6,6 +6,7 @@ import { Mark } from './components/Mark'
 import { Section } from './components/Section'
 import { Wordmark } from './components/Wordmark'
 import { Mixer } from './components/Mixer'
+import { Packs } from './components/Packs'
 import { SetPassword } from './components/SetPassword'
 import { Uploader } from './components/Uploader'
 import { useBar } from './hooks/useBar'
@@ -14,8 +15,9 @@ import { getEngine } from './engine/engine'
 import { useSession } from './hooks/useSession'
 import { codecKey, codecStartOffset } from './lib/calibration'
 import { DEV_LOOPS } from './lib/devLoops'
-import { createBucket, deleteBucket, deleteLoop, ensureUrl, isCompressed, listBuckets, listLoops, updateLoop } from './lib/loops'
-import type { Bucket, LoopPatch } from './lib/loops'
+import { createBucket, deleteBucket, deleteLoop, ensureUrl, isCompressed, listBuckets, listLoops, listPacks, updateLoop, updatePack } from './lib/loops'
+import type { Bucket, LoopPatch, Pack, PackPatch } from './lib/loops'
+import { packStats } from './lib/packs'
 import { supabase } from './lib/supabase'
 import type { Loop } from './engine/types'
 
@@ -31,6 +33,8 @@ function Studio() {
   const engine = useEngine()
   const [loops, setLoops] = useState<Loop[] | null>(null)
   const [buckets, setBuckets] = useState<Bucket[]>([])
+  const [packs, setPacks] = useState<Pack[]>([])
+  const [packFilter, setPackFilter] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showUploader, setShowUploader] = useState(false)
   const [addMode, setAddMode] = useState<'one' | 'many'>('many')
@@ -38,11 +42,13 @@ function Studio() {
   const bar = useBar(getEngine(), engine.playing)
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   const reload = useCallback(() => {
-    Promise.all([listLoops(), listBuckets()]).then(([ls, bs]) => {
+    Promise.all([listLoops(), listBuckets(), listPacks()]).then(([ls, bs, ps]) => {
       setLoops(ls)
       setBuckets(bs)
+      setPacks(ps)
     }, fail)
   }, [])
 
@@ -99,6 +105,18 @@ function Studio() {
     Object.assign(loop, patch) // keep the engine's reference in sync
   }
 
+  const stats = useMemo(() => packStats(library), [library])
+
+  const onEditPack = async (pack: Pack, patch: PackPatch) => {
+    await updatePack(pack.id, patch)
+    setPacks((ps) => ps.map((p) => (p.id === pack.id ? { ...p, ...patch } : p)).sort((a, b) => a.name.localeCompare(b.name)))
+  }
+
+  const onPackFilter = (id: string | null) => {
+    setPackFilter(id)
+    if (id) jump('library')
+  }
+
   const onCreateBucket = async (name: string) => {
     const b = await createBucket(name)
     setBuckets((bs) => [...bs, b].sort((x, y) => x.name.localeCompare(y.name)))
@@ -122,7 +140,6 @@ function Studio() {
   }
 
   const clock = engine.drums.loop ?? engine.drums.pending
-  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   return (
     <main className="min-h-screen bg-cream text-ink">
@@ -141,6 +158,7 @@ function Studio() {
           <Mark />
           <nav className="flex max-w-xs flex-wrap gap-2" aria-label="Sections">
             <button type="button" onClick={() => jump('mix')} className="pill">Mix</button>
+            <button type="button" onClick={() => jump('packs')} className="pill">Packs</button>
             <button type="button" onClick={() => jump('library')} className="pill">Library</button>
             <button type="button" onClick={() => setShowUploader((v) => !v)} className="pill">{showUploader ? 'Close' : 'Add loop'}</button>
             <button type="button" onClick={() => void supabase.auth.signOut()} className="pill">Sign out</button>
@@ -182,13 +200,20 @@ function Studio() {
         </Section>
       )}
 
-      <Section id="library" index={showUploader ? '03' : '02'} label="Library" sub="Drums set the clock · samples follow">
+      <Section id="packs" index={showUploader ? '03' : '02'} label="Packs" sub="Where the loops came from">
+        <Packs packs={packs} stats={stats} selected={packFilter} onSelect={onPackFilter} onEdit={onEditPack} />
+      </Section>
+
+      <Section id="library" index={showUploader ? '04' : '03'} label="Library" sub="Drums set the clock · samples follow">
         {loops === null && !error ? (
           <p className="mono-label text-muted">Loading library…</p>
         ) : (
           <Library
             loops={library}
             buckets={buckets}
+            packs={packs}
+            packFilter={packFilter}
+            onPackFilter={setPackFilter}
             masterBPM={engine.masterBPM}
             isActive={isActive}
             loadingIds={engine.loading}

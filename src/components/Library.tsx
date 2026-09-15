@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Loop, LoopKind } from '../engine/types'
-import type { Bucket, LoopPatch } from '../lib/loops'
+import type { Bucket, LoopPatch, Pack } from '../lib/loops'
 import { parseTagInput } from '../lib/loops'
 import { matches, parseQuery, tagCounts } from '../lib/search'
 
 type Props = {
   loops: Loop[]
   buckets: Bucket[]
+  packs: Pack[]
+  packFilter: string | null
+  onPackFilter: (id: string | null) => void
   masterBPM: number
   isActive: (loop: Loop) => boolean
   loadingIds: readonly string[]
@@ -25,7 +28,13 @@ const pill = (active: boolean, extra = '') => ['pill', active ? '' : 'pill-outli
 
 /** Searchable, taggable, bucketed list of the whole library. */
 export function Library(props: Props) {
-  const { loops, buckets, masterBPM, isActive, loadingIds, onSelect, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
+  const { loops, buckets, packs, packFilter, onPackFilter, masterBPM, isActive, loadingIds, onSelect, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
+  const packById = useMemo(() => new Map(packs.map((p) => [p.id, p])), [packs])
+  const extra = (l: Loop) => {
+    const p = l.packId ? packById.get(l.packId) : undefined
+    return p ? `${p.name} ${p.publisher ?? ''} ${p.genres.join(' ')}` : ''
+  }
+  const selectedPack = packFilter ? packById.get(packFilter) : undefined
   const [q, setQ] = useState('')
   const [minBpm, setMinBpm] = useState('')
   const [maxBpm, setMaxBpm] = useState('')
@@ -43,9 +52,11 @@ export function Library(props: Props) {
       if (l.bpm < lo || l.bpm > hi) return false
       if (bucket === UNSORTED && l.bucketId) return false
       if (bucket && bucket !== UNSORTED && l.bucketId !== bucket) return false
-      return matches(l, query)
+      if (packFilter && l.packId !== packFilter) return false
+      return matches(l, query, extra)
     })
-  }, [loops, query, minBpm, maxBpm, bucket])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loops, query, minBpm, maxBpm, bucket, packFilter, packById])
 
   const tags = useMemo(() => tagCounts(filtered).slice(0, 24), [filtered])
 
@@ -93,7 +104,8 @@ export function Library(props: Props) {
                     </span>
                     <span className="mono-label mt-2 block truncate text-muted">
                       {active ? <span className="text-ink">On · </span> : ''}
-                      {loop.pack ?? ''}
+                      {(loop.packId && packById.get(loop.packId)?.name) ?? loop.pack ?? ''}
+                      {loop.category ? ` / ${loop.category}` : ''}
                       {(loop.tags ?? []).map((t) => (
                         <span key={t} className="ml-2">#{t}</span>
                       ))}
@@ -123,6 +135,7 @@ export function Library(props: Props) {
                   <LoopEditor
                     loop={loop}
                     buckets={buckets}
+                    packs={packs}
                     onSave={async (patch) => {
                       await onEdit(loop, patch)
                       setEditing(null)
@@ -152,6 +165,15 @@ export function Library(props: Props) {
           <input value={maxBpm} onChange={(e) => setMaxBpm(e.target.value)} placeholder="MAX" inputMode="numeric" className="field w-16" />
         </div>
 
+        {selectedPack && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="tag">Pack</span>
+            <span className="headline text-xl">{selectedPack.name}</span>
+            <button type="button" onClick={() => onPackFilter(null)} className="pill pill-outline min-h-7 px-3">
+              All packs
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setBucket(null)} className={pill(bucket === null)}>All</button>
           <button type="button" onClick={() => setBucket(UNSORTED)} className={pill(bucket === UNSORTED)}>Unsorted</button>
@@ -195,10 +217,11 @@ export function Library(props: Props) {
   )
 }
 
-function LoopEditor({ loop, buckets, onSave, onCancel }: { loop: Loop; buckets: Bucket[]; onSave: (patch: LoopPatch) => Promise<void>; onCancel: () => void }) {
+function LoopEditor({ loop, buckets, packs, onSave, onCancel }: { loop: Loop; buckets: Bucket[]; packs: Pack[]; onSave: (patch: LoopPatch) => Promise<void>; onCancel: () => void }) {
   const [name, setName] = useState(loop.name)
   const [tags, setTags] = useState((loop.tags ?? []).join(', '))
   const [bucketId, setBucketId] = useState<string>(loop.bucketId ?? '')
+  const [packId, setPackId] = useState<string>(loop.packId ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -207,7 +230,7 @@ function LoopEditor({ loop, buckets, onSave, onCancel }: { loop: Loop; buckets: 
     setBusy(true)
     setError(null)
     try {
-      await onSave({ name: name.trim() || loop.name, tags: parseTagInput(tags), bucketId: bucketId || null })
+      await onSave({ name: name.trim() || loop.name, tags: parseTagInput(tags), bucketId: bucketId || null, packId: packId || null })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -216,7 +239,7 @@ function LoopEditor({ loop, buckets, onSave, onCancel }: { loop: Loop; buckets: 
   }
 
   return (
-    <form onSubmit={submit} className="grid grid-cols-1 gap-4 border-t border-line py-4 md:grid-cols-3">
+    <form onSubmit={submit} className="grid grid-cols-1 gap-4 border-t border-line py-4 md:grid-cols-4">
       <label className="mono-label flex flex-col gap-1 text-muted">
         Name
         <input value={name} onChange={(e) => setName(e.target.value)} className="field text-ink" />
@@ -234,7 +257,16 @@ function LoopEditor({ loop, buckets, onSave, onCancel }: { loop: Loop; buckets: 
           ))}
         </select>
       </label>
-      <div className="flex items-center gap-2 md:col-span-3">
+      <label className="mono-label flex flex-col gap-1 text-muted">
+        Pack
+        <select value={packId} onChange={(e) => setPackId(e.target.value)} className="field text-ink">
+          <option value="">None</option>
+          {packs.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </label>
+      <div className="flex items-center gap-2 md:col-span-4">
         <button type="submit" disabled={busy} className="pill">Save</button>
         <button type="button" onClick={onCancel} className="pill pill-outline">Cancel</button>
         {error && <p className="mono-label text-ink">{error}</p>}
