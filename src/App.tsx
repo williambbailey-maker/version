@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Library } from './components/Library'
 import { Login } from './components/Login'
+import { Mark } from './components/Mark'
 import { Section } from './components/Section'
+import { Wordmark } from './components/Wordmark'
 import { Mixer } from './components/Mixer'
 import { SetPassword } from './components/SetPassword'
 import { Uploader } from './components/Uploader'
@@ -118,50 +120,43 @@ function Studio() {
   }
 
   const clock = engine.drums.loop ?? engine.drums.pending
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   return (
-    <main className="min-h-screen bg-cream text-jet">
-      <header className="sticky top-0 z-10 grid h-20 grid-cols-2 items-center border-b border-line bg-cream/95 px-4 backdrop-blur md:grid-cols-12 md:px-6">
-        <span className="text-[2.25rem] font-bold uppercase leading-none tracking-[-0.03em] md:col-span-3">Loop Lab</span>
-        <span className="hidden font-mono text-xs uppercase tracking-[0.2em] text-muted md:col-span-6 md:block">
-          {engine.playing ? (
-            <>
-              <span className="text-cobalt">● Playing</span> · Bar {String(bar).padStart(2, '0')}
-            </>
-          ) : (
-            '○ Stopped'
-          )}
-          {clock ? ` · ${clock.name}` : ''}
-        </span>
-        <span className="flex justify-end gap-4 md:col-span-3">
-          <button type="button" onClick={() => setShowUploader((v) => !v)} className="text-sm font-semibold transition-colors duration-300 ease-linear hover:text-cobalt">
-            {showUploader ? 'Close' : 'Add loop'}
-          </button>
-          <button type="button" onClick={() => void supabase.auth.signOut()} className="text-sm font-semibold transition-colors duration-300 ease-linear hover:text-cobalt">
-            Sign out
-          </button>
-        </span>
+    <main className="min-h-screen bg-cream text-ink">
+      <header className="px-4 pt-4 md:px-6">
+        <Wordmark />
+        <div className="mono-label flex justify-between pt-2 text-muted">
+          <span>Loop auditioning</span>
+          <span className="hidden sm:inline">{clock ? clock.name : 'No clock'}</span>
+          <span>{engine.masterBPM} bpm</span>
+          <span>{engine.playing ? `Playing · bar ${String(bar).padStart(2, '0')}` : 'Stopped'}</span>
+        </div>
       </header>
 
-      <Section index="01" label="Transport" className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
-        <div>
-          <span className="label-caps block">Master tempo</span>
-          <span className="display-num mt-3 block text-[6rem] md:text-[9rem]">{engine.masterBPM}</span>
-          <span className="label-caps mt-3 block">
-            BPM{clock ? ` · ${clock.name}` : ' · choose a drum loop'}
-            {engine.playing ? ` · bar ${String(bar).padStart(2, '0')}` : ''}
-          </span>
+      <section className="grid grid-cols-1 gap-8 px-4 py-10 md:grid-cols-2 md:px-6 md:py-16">
+        <div className="flex items-start gap-4">
+          <Mark />
+          <nav className="flex max-w-xs flex-wrap gap-2" aria-label="Sections">
+            <button type="button" onClick={() => jump('mix')} className="pill">Mix</button>
+            <button type="button" onClick={() => jump('library')} className="pill">Library</button>
+            <button type="button" onClick={() => setShowUploader((v) => !v)} className="pill">{showUploader ? 'Close' : 'Add loop'}</button>
+            <button type="button" onClick={() => void supabase.auth.signOut()} className="pill">Sign out</button>
+          </nav>
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          className={['btn min-w-48 py-5 text-base', engine.playing ? 'bg-jet text-cream hover:bg-cobalt' : 'bg-cobalt text-cream hover:bg-jet'].join(' ')}
-        >
-          {engine.playing ? 'Stop' : 'Play'}
-        </button>
-      </Section>
+        <div className="flex flex-col items-start gap-6 md:items-end md:text-right">
+          <h1 className="headline text-3xl md:text-5xl">Your loops, locked to your drums.</h1>
+          <button
+            type="button"
+            onClick={onToggle}
+            className={['pill min-h-14 px-10 text-base', engine.playing ? 'grain' : ''].join(' ')}
+          >
+            {engine.playing ? 'Stop' : 'Play'}
+          </button>
+        </div>
+      </section>
 
-      <Section index="02" label="Mix">
+      <Section id="mix" index="01" label="Mix" sub="What's playing">
         <Mixer
           masterBPM={engine.masterBPM}
           drums={engine.drums}
@@ -172,14 +167,14 @@ function Studio() {
       </Section>
 
       {showUploader && (
-        <Section index="03" label="Add">
+        <Section index="02" label="Add" sub="Upload a loop">
           <Uploader buckets={buckets} onAdded={onAdded} />
         </Section>
       )}
 
-      <Section index={showUploader ? '04' : '03'} label="Library">
+      <Section id="library" index={showUploader ? '03' : '02'} label="Library" sub="Drums set the clock · samples follow">
         {loops === null && !error ? (
-          <p className="font-mono text-xs text-muted">Loading library…</p>
+          <p className="mono-label text-muted">Loading library…</p>
         ) : (
           <Library
             loops={library}
@@ -198,11 +193,14 @@ function Studio() {
 
       {(error ?? engine.error) && (
         <div className="border-t border-line px-4 py-4 md:px-6">
-          <p className="font-mono text-sm text-cobalt">{error ?? engine.error}</p>
+          <p className="tag">{error ?? engine.error}</p>
         </div>
       )}
       <footer className="border-t border-line px-4 py-6 md:px-6">
-        <span className="label-caps">Loop Lab · varispeed · bar-quantized</span>
+        <div className="mono-label flex justify-between text-muted">
+          <span>Loop Lab</span>
+          <span>Varispeed · bar-quantized</span>
+        </div>
       </footer>
     </main>
   )

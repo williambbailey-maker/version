@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
+import { Mark } from './Mark'
+import { Wordmark } from './Wordmark'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -45,64 +47,55 @@ export function Login() {
   }
 
   return (
-    <main className="min-h-screen bg-cream text-jet">
-      <header className="sticky top-0 z-10 flex h-20 items-center border-b border-line bg-cream/95 px-4 backdrop-blur md:px-6">
-        <span className="text-[2.25rem] font-bold uppercase leading-none tracking-[-0.03em]">Loop Lab</span>
-      </header>
-      <section className="grid min-h-[calc(100vh-5rem)] grid-cols-1 md:grid-cols-12">
-        <div className="flex items-center gap-3 border-b border-line px-4 py-3 md:items-start md:border-b-0 md:border-r md:px-6 md:py-8 md:col-span-3">
-          <span className="block h-4 w-4 bg-jet" aria-hidden="true" />
-          <span className="label-caps text-jet md:[writing-mode:vertical-rl] md:rotate-180">Access</span>
+    <main className="min-h-screen bg-cream text-ink">
+      <header className="px-4 pt-4 md:px-6">
+        <Wordmark />
+        <div className="mono-label flex justify-between pt-2 text-muted">
+          <span>Loop auditioning</span>
+          <span className="hidden sm:inline">Varispeed</span>
+          <span className="hidden sm:inline">Bar-quantized</span>
+          <span>Access</span>
         </div>
-        <div className="flex flex-col justify-center gap-10 px-4 py-10 md:col-span-9 md:px-8">
-          <h1 className="text-6xl font-bold leading-[0.85] tracking-[-0.04em] md:text-8xl">
-            Your loops,
-            <br />
-            <span className="text-cobalt">locked</span> to
-            <br />
-            your drums.
-          </h1>
-          <form onSubmit={signIn} className="grid max-w-xl grid-cols-1 gap-3">
-            <label className="label-caps flex flex-col gap-2">
+      </header>
+      <section className="grid grid-cols-1 gap-10 px-4 py-12 md:grid-cols-2 md:px-6 md:py-20">
+        <div className="flex items-start gap-4">
+          <Mark />
+          <div className="flex flex-col gap-1">
+            <span className="tag">Loop Lab</span>
+            <span className="tag">A private loop library</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-8">
+          <h1 className="headline text-4xl md:text-5xl">Your loops, locked to your drums.</h1>
+          <form onSubmit={signIn} className="grid max-w-md gap-4">
+            <label className="mono-label flex flex-col gap-1 text-muted">
               Email
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="field text-base normal-case tracking-normal text-jet"
-                required
-              />
+              <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="field text-ink" required />
             </label>
-            <label className="label-caps flex flex-col gap-2">
+            <label className="mono-label flex flex-col gap-1 text-muted">
               Password
               <input
                 type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="field text-base normal-case tracking-normal text-jet"
+                className="field text-ink"
                 minLength={6}
               />
             </label>
-            <div className="mt-2 flex flex-wrap items-center gap-4">
-              <button type="submit" disabled={busy} className="btn bg-cobalt text-cream hover:bg-jet disabled:opacity-40">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="submit" disabled={busy} className="pill">
                 Sign in
               </button>
-              <button
-                type="button"
-                onClick={signUp}
-                disabled={busy || !email || password.length < 6}
-                className="btn bg-jet text-cream hover:bg-cobalt disabled:opacity-40"
-              >
+              <button type="button" onClick={signUp} disabled={busy || !email || password.length < 6} className="pill pill-outline">
                 Create account
               </button>
-              <button type="button" onClick={forgot} disabled={busy} className="label-caps underline underline-offset-4 hover:text-cobalt">
+              <button type="button" onClick={forgot} disabled={busy} className="pill pill-outline">
                 Forgot password?
               </button>
             </div>
           </form>
-          {msg && <p className="max-w-[400px] text-lg leading-normal text-ink">{msg}</p>}
+          {msg && <p className="mono-label max-w-md text-muted">{msg}</p>}
         </div>
       </section>
     </main>
