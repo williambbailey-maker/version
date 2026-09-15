@@ -7,6 +7,11 @@
  *   npm run import -- "~/Splice/sounds/packs" [--originals] [--dry-run]
  *                    [--format mp3|aac] [--bitrate 192k] [--kind drums|sample|auto]
  *                    [--bucket "Name"] [--tags reggae,guitar] [--packs packs.json]
+ *                    [--pack "Name"] [--pack-url https://…]
+ *
+ * --pack "Name" treats the whole folder as one pack (sub-folders become
+ * categories); --pack-url reads the pack's web page for publisher,
+ * description, cover and genres (blanks only, never overwrites).
  *
  * Packs: the first folder under <folder> is the pack ("<folder>/<Pack>/..."),
  * deeper folders become the loop's category. Importing a single pack folder
@@ -33,6 +38,7 @@ import { basename, extname, join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { combineEstimates, estimateBPM, bpmFromFilename, keyFromFilename } from '../src/lib/tempo'
 import { packFromPath } from '../src/lib/packs'
+import { extractPageInfo } from '../src/lib/pageinfo'
 import type { Bars, LoopKind } from '../src/engine/types'
 
 const exec = promisify(execFile)
@@ -65,13 +71,15 @@ type Args = {
   bucket: string | null
   tags: string[]
   packsFile: string | null
+  pack: string | null
+  packUrl: string | null
 }
 
 const PREVIEW_EXT: Record<Format, string> = { mp3: 'mp3', aac: 'm4a' }
 const PREVIEW_MIME: Record<Format, string> = { mp3: 'audio/mpeg', aac: 'audio/mp4' }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { root: '', originals: false, dryRun: false, format: 'mp3', bitrate: '192k', kind: 'auto', bucket: null, tags: [], packsFile: null }
+  const a: Args = { root: '', originals: false, dryRun: false, format: 'mp3', bitrate: '192k', kind: 'auto', bucket: null, tags: [], packsFile: null, pack: null, packUrl: null }
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i]!
     if (v === '--originals') a.originals = true
@@ -82,6 +90,8 @@ function parseArgs(argv: string[]): Args {
     else if (v === '--bucket') a.bucket = argv[++i] ?? null
     else if (v === '--tags') a.tags = (argv[++i] ?? '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
     else if (v === '--packs') a.packsFile = argv[++i] ?? null
+    else if (v === '--pack') a.pack = argv[++i] ?? null
+    else if (v === '--pack-url') a.packUrl = argv[++i] ?? null
     else if (!a.root) a.root = v
   }
   if (!a.root || !(a.format in PREVIEW_EXT)) {
@@ -233,6 +243,22 @@ async function main(): Promise<void> {
     packIds.set(name, id)
     return id
   }
+  // --pack-url: read the page once and use it as this pack's info.
+  if (args.pack && args.packUrl) {
+    try {
+      const res = await fetch(args.packUrl, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; LoopLab/1.0)' } })
+      const info = extractPageInfo(await res.text(), res.url)
+      const entry: PackInfo = { name: args.pack, url: res.url }
+      if (info.publisher) entry.publisher = info.publisher
+      if (info.description) entry.description = info.description
+      if (info.image) entry.cover_url = info.image
+      if (info.genres.length) entry.genres = info.genres
+      packInfo.set(args.pack, entry)
+      console.log(`pack info from ${res.url}: ${info.publisher ?? '-'} · ${info.genres.join(', ') || '-'}`)
+    } catch (e) {
+      console.error(`Could not read ${args.packUrl}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
   // Apply info for packs listed in the file even if no new files arrive.
   for (const name of packInfo.keys()) await packIdFor(name)
 
@@ -265,7 +291,9 @@ async function main(): Promise<void> {
         continue
       }
       const name = basename(file, extname(file))
-      const { pack, category } = packFromPath(sourcePath, rootName)
+      const { pack, category } = args.pack
+        ? { pack: args.pack, category: sourcePath.includes('/') ? sourcePath.split('/').slice(0, -1).join('/') : null }
+        : packFromPath(sourcePath, rootName)
 
       const duration = await probeDuration(file)
       const filenameBPM = bpmFromFilename(name)

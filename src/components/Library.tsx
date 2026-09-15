@@ -166,12 +166,28 @@ export function Library(props: Props) {
         </div>
 
         {selectedPack && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="tag">Pack</span>
-            <span className="headline text-xl">{selectedPack.name}</span>
-            <button type="button" onClick={() => onPackFilter(null)} className="pill pill-outline min-h-7 px-3">
-              All packs
-            </button>
+          <div className="flex gap-4 border border-line p-4">
+            {selectedPack.coverUrl ? (
+              <img src={selectedPack.coverUrl} alt="" className="grain h-24 w-24 shrink-0 object-cover" />
+            ) : (
+              <span className="grain block h-24 w-24 shrink-0 bg-ink" aria-hidden="true" />
+            )}
+            <div className="flex min-w-0 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="tag">Pack</span>
+                <span className="headline text-2xl">{selectedPack.name}</span>
+                {selectedPack.publisher && <span className="mono-label text-muted">{selectedPack.publisher}</span>}
+              </div>
+              {selectedPack.description && <p className="line-clamp-3 max-w-2xl text-sm text-ink">{selectedPack.description}</p>}
+              <div className="flex flex-wrap gap-2">
+                {selectedPack.genres.map((g) => (
+                  <span key={g} className="tag">{g}</span>
+                ))}
+                <button type="button" onClick={() => onPackFilter(null)} className="pill pill-outline min-h-7 px-3">
+                  All packs
+                </button>
+              </div>
+            </div>
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2">

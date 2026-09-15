@@ -2,6 +2,7 @@ import { getContext } from '../engine/context'
 import type { Bars, LoopKind } from '../engine/types'
 import { WEB_MP3, encodeClick, encodeMp3 } from './encode'
 import { ensurePack, existingSourcePaths, uploadBlob, uploadCalibration } from './loops'
+import type { PackPatch } from './loops'
 import { packFromPath } from './packs'
 import { estimateLoop, guessBars, keyFromFilename } from './tempo'
 import type { TempoSource } from './tempo'
@@ -28,9 +29,22 @@ export type BulkOptions = {
   tags: string[]
   kind: LoopKind | 'auto'
   originals: boolean // upload the file as-is instead of an MP3 preview
+  /** 'one': everything goes into `packName` (sub-folders become categories). 'folders': first folder = pack. */
+  packMode: 'one' | 'folders'
+  packName: string | null
+  packInfo: PackPatch | null
 }
 
 const DRUMS_RE = /drum|beat|break|perc|kick|top/i
+
+/** The picked folder's name, if the selection came from a folder picker. */
+export function rootFolderName(files: FileList | File[]): string | null {
+  for (const file of Array.from(files)) {
+    const full = (file as File & { webkitRelativePath?: string }).webkitRelativePath
+    if (full && full.includes('/')) return full.split('/')[0]!
+  }
+  return null
+}
 
 export function makeItems(files: FileList | File[]): BulkItem[] {
   const out: BulkItem[] = []
@@ -67,10 +81,18 @@ export async function runBulkImport(
     if (!name) return null
     let id = packIds.get(name)
     if (!id) {
-      id = await ensurePack(name)
+      id = await ensurePack(name, opts.packMode === 'one' && opts.packInfo ? opts.packInfo : undefined)
       packIds.set(name, id)
     }
     return id
+  }
+  // One folder = one pack: every path's folders become the category.
+  if (opts.packMode === 'one') {
+    for (const it of items) {
+      it.pack = opts.packName
+      const segs = it.relPath.split('/')
+      it.category = segs.length > 1 ? segs.slice(0, -1).join('/') : null
+    }
   }
 
   for (const item of items) {
