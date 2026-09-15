@@ -23,7 +23,7 @@ export function SetPassword({ onDone }: Props) {
   return (
     <main className="min-h-screen bg-cream text-jet">
       <header className="sticky top-0 z-10 flex h-20 items-center border-b border-line bg-cream/95 px-4 backdrop-blur md:px-6">
-        <span className="text-lg font-bold uppercase tracking-[-0.02em]">Loop Lab</span>
+        <span className="text-[2.25rem] font-bold uppercase leading-none tracking-[-0.03em]">Loop Lab</span>
       </header>
       <section className="grid min-h-[calc(100vh-5rem)] grid-cols-1 md:grid-cols-12">
         <div className="flex items-center gap-3 border-b border-line px-4 py-3 md:items-start md:border-b-0 md:border-r md:px-6 md:py-8 md:col-span-3">
