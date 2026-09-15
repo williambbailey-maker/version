@@ -118,39 +118,40 @@ export function Uploader({ buckets, onAdded }: Props) {
   const mismatch = duration !== null && expected !== null && Math.abs(duration - expected) / expected > 0.02
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 rounded-lg border border-stone-300 bg-white p-4">
-      <h2 className="text-sm uppercase tracking-wide text-stone-500">Add a loop</h2>
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <label className="flex min-h-14 cursor-pointer items-center border border-dashed border-jet px-4 label-caps text-jet">
+        <input
+          type="file"
+          accept="audio/*,.wav,.aif,.aiff,.m4a,.mp3"
+          onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
+          className="sr-only"
+        />
+        {file ? file.name : 'Choose an audio file'}
+      </label>
 
-      <input
-        type="file"
-        accept="audio/*,.wav,.aif,.aiff,.m4a,.mp3"
-        onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
-        className="text-sm"
-      />
+      {detecting && <p className="font-mono text-xs text-muted">Detecting tempo…</p>}
+      {detected && !detecting && <p className="font-mono text-xs text-muted">Auto: {detected}. Edit anything below.</p>}
 
-      {detecting && <p className="text-xs text-stone-500">Detecting tempo…</p>}
-      {detected && !detecting && <p className="text-xs text-stone-500">Auto: {detected}. Edit anything below.</p>}
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 text-sm">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <label className="label-caps flex flex-col gap-2">
           Name
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded border border-stone-300 px-2 py-2"
+            className="field text-base normal-case tracking-normal text-jet"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="label-caps flex flex-col gap-2">
           BPM
           <input
             inputMode="decimal"
             value={bpm}
             onChange={(e) => onBpm(e.target.value)}
             placeholder="e.g. 92"
-            className="rounded border border-stone-300 px-2 py-2 font-mono"
+            className="field font-mono text-base normal-case tracking-normal text-jet"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="label-caps flex flex-col gap-2">
           Bars
           <select
             value={bars}
@@ -158,7 +159,7 @@ export function Uploader({ buckets, onAdded }: Props) {
               setBars(Number(e.target.value) as Bars)
               setBarsTouched(true)
             }}
-            className="rounded border border-stone-300 px-2 py-2 font-mono"
+            className="field font-mono text-base normal-case tracking-normal text-jet"
           >
             {BARS.map((b) => (
               <option key={b} value={b}>
@@ -167,32 +168,32 @@ export function Uploader({ buckets, onAdded }: Props) {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="label-caps flex flex-col gap-2">
           Kind
           <select
             value={kind}
             onChange={(e) => setKind(e.target.value as LoopKind)}
-            className="rounded border border-stone-300 px-2 py-2"
+            className="field text-base normal-case tracking-normal text-jet"
           >
             <option value="drums">drums</option>
             <option value="sample">sample</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="label-caps flex flex-col gap-2">
           Tags
           <input
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="reggae, guitar"
-            className="rounded border border-stone-300 px-2 py-2"
+            className="field text-base normal-case tracking-normal text-jet"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="label-caps flex flex-col gap-2">
           Bucket
           <select
             value={bucketId}
             onChange={(e) => setBucketId(e.target.value)}
-            className="rounded border border-stone-300 px-2 py-2"
+            className="field text-base normal-case tracking-normal text-jet"
           >
             <option value="">Unsorted</option>
             {buckets.map((b) => (
@@ -205,22 +206,23 @@ export function Uploader({ buckets, onAdded }: Props) {
       </div>
 
       {duration !== null && (
-        <p className={['font-mono text-xs', mismatch ? 'text-amber-700' : 'text-stone-500'].join(' ')}>
+        <p className={['font-mono text-xs', mismatch ? 'text-cobalt' : 'text-muted'].join(' ')}>
           file {duration.toFixed(2)}s
           {expected !== null && ` · ${bars} bar${bars > 1 ? 's' : ''} @ ${bpmNum} = ${expected.toFixed(2)}s`}
           {mismatch && ' · lengths differ; bpm + bars will be trusted'}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={!file || !bpmOk || busy || detecting}
-        className="min-h-12 rounded bg-stone-900 px-4 text-white disabled:opacity-40"
-      >
-        {busy ? 'Uploading…' : 'Add'}
-      </button>
-
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      <div className="flex items-center gap-4">
+        <button
+          type="submit"
+          disabled={!file || !bpmOk || busy || detecting}
+          className="btn bg-cobalt text-cream hover:bg-jet disabled:opacity-40"
+        >
+          {busy ? 'Uploading…' : 'Add to library'}
+        </button>
+        {error && <p className="text-sm text-cobalt">{error}</p>}
+      </div>
     </form>
   )
 }

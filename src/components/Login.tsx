@@ -45,48 +45,66 @@ export function Login() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 bg-stone-50 p-6 text-stone-900">
-      <h1 className="text-2xl">Loop Lab</h1>
-      <form onSubmit={signIn} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
-          <input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded border border-stone-300 px-3 py-3"
-            required
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Password
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded border border-stone-300 px-3 py-3"
-            required={false}
-            minLength={6}
-          />
-        </label>
-        <button type="submit" disabled={busy} className="min-h-12 rounded bg-orange-600 text-white disabled:opacity-40">
-          Sign in
-        </button>
-        <button
-          type="button"
-          onClick={signUp}
-          disabled={busy || !email || password.length < 6}
-          className="min-h-12 rounded border border-stone-400 text-stone-700 disabled:opacity-40"
-        >
-          Create account
-        </button>
-        <button type="button" onClick={forgot} disabled={busy} className="text-sm text-stone-500 underline">
-          Forgot password?
-        </button>
-      </form>
-      {msg && <p className="text-sm text-stone-700">{msg}</p>}
+    <main className="min-h-screen bg-cream text-jet">
+      <header className="sticky top-0 z-10 flex h-20 items-center border-b border-line bg-cream/95 px-4 backdrop-blur md:px-6">
+        <span className="text-lg font-bold uppercase tracking-[-0.02em]">Loop Lab</span>
+      </header>
+      <section className="grid min-h-[calc(100vh-5rem)] grid-cols-1 md:grid-cols-12">
+        <div className="flex items-center gap-3 border-b border-line px-4 py-3 md:items-start md:border-b-0 md:border-r md:px-6 md:py-8 md:col-span-3">
+          <span className="block h-4 w-4 bg-jet" aria-hidden="true" />
+          <span className="label-caps text-jet md:[writing-mode:vertical-rl] md:rotate-180">Access</span>
+        </div>
+        <div className="flex flex-col justify-center gap-10 px-4 py-10 md:col-span-9 md:px-8">
+          <h1 className="text-6xl font-bold leading-[0.85] tracking-[-0.04em] md:text-8xl">
+            Your loops,
+            <br />
+            <span className="text-cobalt">locked</span> to
+            <br />
+            your drums.
+          </h1>
+          <form onSubmit={signIn} className="grid max-w-xl grid-cols-1 gap-3">
+            <label className="label-caps flex flex-col gap-2">
+              Email
+              <input
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="field text-base normal-case tracking-normal text-jet"
+                required
+              />
+            </label>
+            <label className="label-caps flex flex-col gap-2">
+              Password
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="field text-base normal-case tracking-normal text-jet"
+                minLength={6}
+              />
+            </label>
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <button type="submit" disabled={busy} className="btn bg-cobalt text-cream hover:bg-jet disabled:opacity-40">
+                Sign in
+              </button>
+              <button
+                type="button"
+                onClick={signUp}
+                disabled={busy || !email || password.length < 6}
+                className="btn bg-jet text-cream hover:bg-cobalt disabled:opacity-40"
+              >
+                Create account
+              </button>
+              <button type="button" onClick={forgot} disabled={busy} className="label-caps underline underline-offset-4 hover:text-cobalt">
+                Forgot password?
+              </button>
+            </div>
+          </form>
+          {msg && <p className="max-w-[400px] text-lg leading-normal text-ink">{msg}</p>}
+        </div>
+      </section>
     </main>
   )
 }
