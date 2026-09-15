@@ -159,6 +159,7 @@ export function Room(props: Props) {
 
       {/* mic → tag */}
       <g {...hotProps(`Mic: loops tagged ${roomMap.mic}`, () => onTag(roomMap.mic))}>
+        <rect x="176" y="222" width="58" height="84" fill="transparent" />
         <rect className="w" x="196" y="236" width="18" height="30" rx="9" />
         <path className="l" d="M192 250c0 12 6 20 13 20s13-8 13-20M205 270v30M196 300h18" />
         <path className="l" d="M199 244h12M199 250h12M199 256h12" />
@@ -184,6 +185,7 @@ export function Room(props: Props) {
 
       {/* guitar → tag */}
       <g {...hotProps(`Guitar: loops tagged ${roomMap.guitar}`, () => onTag(roomMap.guitar))}>
+        <rect x="276" y="288" width="86" height="122" fill="transparent" />
         <path className="l" d="M300 322l22 78" />
         <path className="w" d="M330 396c-10 6-26 8-34 2-8-6-8-22 4-30 2-14 16-24 30-18 14 6 18 24 12 34 0 8-4 10-12 12z" />
         <circle className="l" cx="316" cy="382" r="5" />
@@ -248,7 +250,7 @@ export function Room(props: Props) {
 
   const shelf = (
     <svg className="scene block h-auto w-full" viewBox="0 0 1000 420" role="group" aria-label="The shelf">
-      <text x="60" y="70" fontSize="11" fill="#e8453c">
+      <text x="60" y="70" fontSize="11" fill="#e8453c" className="hidden md:block">
         {packs.length ? '● EACH TAPE IS A PACK. PULL ONE DOWN.' : '● THE SHELF IS EMPTY. IMPORT A FOLDER AND IT FILLS UP.'}
       </text>
       <path className="l" d="M60 180h880M60 300h880M60 360h880" />
@@ -264,7 +266,7 @@ export function Room(props: Props) {
       <rect className="w" x="120" y="230" width="90" height="56" rx="6" />
       <circle className="l" cx="150" cy="258" r="14" />
       <path className="l" d="M176 246h22M176 258h22M176 270h22" />
-      <text x="500" y="392" textAnchor="middle" fontSize="11" fill="#8a7a72">
+      <text x="500" y="392" textAnchor="middle" fontSize="11" fill="#8a7a72" className="hidden md:block">
         THE SHELF — {packs.length} PACK{packs.length === 1 ? '' : 'S'}
       </text>
     </svg>
@@ -283,9 +285,11 @@ export function Room(props: Props) {
           <button type="button" onClick={() => setRoom(1)} aria-label="The shelf" className={['h-2 w-2 rounded-full', room === 1 ? 'bg-ink' : 'bg-line'].join(' ')} />
         </div>
       </div>
-      {/* phone: stacked */}
-      <div className="flex flex-col gap-6 md:hidden">
+      {/* phone: stacked, with HTML captions since SVG text is too small there */}
+      <div className="flex flex-col gap-4 md:hidden">
+        <p className="caption">The desk. Tap the turntable to play, the instruments for loops.</p>
         {desk}
+        <p className="caption">The shelf. {packs.length ? 'Each tape is a pack.' : 'Import a folder and it fills up.'}</p>
         {shelf}
       </div>
       <RoomNav room={room} onRoom={setRoom} />

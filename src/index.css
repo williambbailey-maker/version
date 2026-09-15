@@ -222,11 +222,6 @@
   font-size: 10px;
   letter-spacing: 0.08em;
 }
-@media (hover: none) {
-  .hot .tip {
-    opacity: 1;
-  }
-}
 
 .cloud {
   animation: drift 28s linear infinite;

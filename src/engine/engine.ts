@@ -48,6 +48,8 @@ export class Engine {
   private error: string | null = null
   /** Scheduled stop boundary, if a bar-quantized stop is in flight. */
   private stopAt: number | null = null
+  /** The drum loop still being fetched/decoded, so play() can wait for it. */
+  private drumsLoading: Promise<unknown> | null = null
   private _state: EngineState
 
   constructor(ctx: AudioContext = getContext()) {
@@ -171,6 +173,8 @@ export class Engine {
   async play(): Promise<void> {
     if (this.playing) return
     await ensureRunning(this.ctx)
+    if (this.drumsLoading) await this.drumsLoading.catch(() => {})
+    if (this.playing) return
     const drums = this.drums.pending
     if (!drums) throw new Error('Choose a drum loop before pressing play')
 
@@ -214,7 +218,14 @@ export class Engine {
 
   private async selectDrums(loop: Loop): Promise<void> {
     if (this.drums.current?.id === loop.id) return
-    const loaded = await this.load(loop)
+    const loading = this.load(loop)
+    this.drumsLoading = loading
+    let loaded: LoadedLoop
+    try {
+      loaded = await loading
+    } finally {
+      if (this.drumsLoading === loading) this.drumsLoading = null
+    }
     if (!this.playing) {
       this.drums.setPending(loaded)
       this.transport.setMasterBPM(loaded.bpm)
