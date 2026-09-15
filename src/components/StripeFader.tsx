@@ -7,6 +7,8 @@ type Props = {
   value: number // 0..1
   label: string
   onChange: (v: number) => void
+  /** Stripe colour: black for the drum clock, grey for samples. */
+  tone?: 'ink' | 'muted'
 }
 
 /**
@@ -14,7 +16,7 @@ type Props = {
  * cassette stripes as a fader. Drag or tap to set; a hidden range input
  * keeps it keyboard- and screen-reader-operable.
  */
-export function StripeFader({ value, label, onChange }: Props) {
+export function StripeFader({ value, label, onChange, tone = 'ink' }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
 
@@ -44,7 +46,7 @@ export function StripeFader({ value, label, onChange }: Props) {
         aria-hidden="true"
       >
         {Array.from({ length: STEPS }, (_, i) => (
-          <span key={i} className={['block flex-1', i < lit ? 'grain bg-ink' : 'bg-ink/10'].join(' ')} />
+          <span key={i} className={['block flex-1', i < lit ? (tone === 'ink' ? 'grain bg-ink' : 'grain bg-muted') : 'bg-ink/10'].join(' ')} />
         ))}
       </div>
       <input
