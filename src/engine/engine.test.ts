@@ -4,15 +4,20 @@ import type { Loop } from './types'
 
 /** Minimal fake of the Web Audio surface the engine touches. */
 type Call = { kind: 'start' | 'stop'; loop: string; at: number; offset?: number; rate?: number }
+type GainNodeFake = { gain: { value: number; target: number | null; setTargetAtTime(v: number): void; setValueAtTime(v: number): void }; connect(): void; disconnect(): void }
 
-function fakeContext(calls: Call[]) {
-  const param = (value = 1) => ({ value, setTargetAtTime() {}, setValueAtTime(v: number) { this.value = v } })
+function fakeContext(calls: Call[], gains: GainNodeFake[] = []) {
+  const param = (value = 1) => ({ value, target: null as number | null, setTargetAtTime(v: number) { this.target = v }, setValueAtTime(v: number) { this.value = v } })
   const ctx = {
     currentTime: 0,
     state: 'running',
     destination: {},
     async resume() {},
-    createGain: () => ({ gain: param(1), connect() {}, disconnect() {} }),
+    createGain: () => {
+      const g: GainNodeFake = { gain: param(1), connect() {}, disconnect() {} }
+      gains.push(g)
+      return g
+    },
     createBufferSource() {
       const node = {
         buffer: null as { id: string } | null,
@@ -46,9 +51,12 @@ function loop(id: string, kind: Loop['kind'], bpm: number, bars: Loop['bars'] = 
 
 function make() {
   const calls: Call[] = []
-  const ctx = fakeContext(calls)
+  const gains: GainNodeFake[] = []
+  const ctx = fakeContext(calls, gains)
   const engine = new Engine(ctx)
-  return { engine, calls, ctx: ctx as unknown as { currentTime: number } }
+  // gains[0] is the master; slot gain nodes follow in creation order (drums first).
+  const targets = () => gains.slice(1).map((g) => g.gain.target)
+  return { engine, calls, gains, targets, ctx: ctx as unknown as { currentTime: number } }
 }
 
 describe('Engine', () => {
@@ -122,6 +130,44 @@ describe('Engine', () => {
     const swap = calls.find((c) => c.kind === 'start' && c.loop === 'd2')!
     expect(engine.transport.transportStart).toBeCloseTo(swap.at, 10)
     expect(engine.transport.rateFor(88)).toBeCloseTo(120 / 88, 10)
+  })
+
+  it('mute silences one slot, solo silences the others, faders come back intact', async () => {
+    const { engine, targets } = make()
+    await engine.select(loop('d', 'drums', 100, 2, 0.8))
+    await engine.select(loop('a', 'sample', 88, 2, 0.6))
+    await engine.select(loop('b', 'sample', 120, 1, 0.4))
+    await engine.play()
+    expect(targets()).toEqual([0.8, 0.6, 0.4])
+
+    engine.setMuted('a', true)
+    expect(targets()).toEqual([0.8, 0, 0.4])
+    expect(engine.state.samples[0]?.muted).toBe(true)
+
+    engine.setSolo('b', true)
+    expect(targets()).toEqual([0, 0, 0.4]) // drums silenced by solo, a still muted
+    engine.setSolo('d', true)
+    expect(targets()).toEqual([0.8, 0, 0.4]) // two solos: both audible
+    engine.setSolo('b', false)
+    engine.setSolo('d', false)
+    engine.setMuted('a', false)
+    expect(targets()).toEqual([0.8, 0.6, 0.4])
+
+    engine.setGain('a', 0.2)
+    engine.setMuted('a', true)
+    expect(engine.state.samples[0]?.gain).toBe(0.2) // fader position survives mute
+    expect(targets()[1]).toBe(0)
+  })
+
+  it('removing a soloed sample releases the others', async () => {
+    const { engine, targets } = make()
+    await engine.select(loop('d', 'drums', 100, 2, 0.8))
+    await engine.select(loop('a', 'sample', 88, 2, 0.6))
+    await engine.play()
+    engine.setSolo('a', true)
+    expect(targets()[0]).toBe(0)
+    engine.removeSample('a')
+    expect(targets()[0]).toBe(0.8)
   })
 
   it('honours a codec start offset', async () => {

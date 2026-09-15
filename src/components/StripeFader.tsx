@@ -7,8 +7,10 @@ type Props = {
   value: number // 0..1
   label: string
   onChange: (v: number) => void
-  /** Stripe colour: black for the drum clock, grey for samples. */
-  tone?: 'ink' | 'muted'
+  /** Stripe colour: black for the drum clock, accent for samples. */
+  tone?: 'ink' | 'accent'
+  /** Render dimmed (muted or silenced by another solo). */
+  dim?: boolean
 }
 
 /**
@@ -16,7 +18,7 @@ type Props = {
  * cassette stripes as a fader. Drag or tap to set; a hidden range input
  * keeps it keyboard- and screen-reader-operable.
  */
-export function StripeFader({ value, label, onChange, tone = 'ink' }: Props) {
+export function StripeFader({ value, label, onChange, tone = 'ink', dim = false }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
 
@@ -34,7 +36,7 @@ export function StripeFader({ value, label, onChange, tone = 'ink' }: Props) {
     <div className="flex flex-col gap-1">
       <div
         ref={ref}
-        className="flex h-40 cursor-ns-resize touch-none flex-col-reverse gap-1"
+        className={['flex h-40 cursor-ns-resize touch-none flex-col-reverse gap-1 transition-opacity duration-200 ease-linear', dim ? 'opacity-25' : ''].join(' ')}
         onPointerDown={(e) => {
           dragging.current = true
           e.currentTarget.setPointerCapture(e.pointerId)
@@ -46,7 +48,7 @@ export function StripeFader({ value, label, onChange, tone = 'ink' }: Props) {
         aria-hidden="true"
       >
         {Array.from({ length: STEPS }, (_, i) => (
-          <span key={i} className={['block flex-1', i < lit ? (tone === 'ink' ? 'grain bg-ink' : 'grain bg-muted') : 'bg-ink/10'].join(' ')} />
+          <span key={i} className={['block flex-1', i < lit ? (tone === 'ink' ? 'grain bg-ink' : 'grain bg-accent') : 'bg-ink/10'].join(' ')} />
         ))}
       </div>
       <input

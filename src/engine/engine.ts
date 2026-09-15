@@ -13,7 +13,9 @@ const SWAP_MIN_LEAD = 0.02
 export type SlotState = {
   loop: Loop | null    // sounding (or scheduled)
   pending: Loop | null // chosen while stopped
-  gain: number         // current mix level 0..1
+  gain: number         // fader position 0..1
+  muted: boolean
+  solo: boolean
 }
 
 export type EngineState = {
@@ -104,15 +106,45 @@ export class Engine {
     if (!slot) return
     this.samples.delete(loopId)
     slot.dispose(this.playing ? this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD) : this.ctx.currentTime)
+    this.applyMix() // a removed solo releases the others
     this.emit()
   }
 
-  /** Mix level for an active loop (drums or sample), ramped. */
+  private slotFor(loopId: string): Slot | undefined {
+    return this.drums.current?.id === loopId ? this.drums : this.samples.get(loopId)
+  }
+
+  /** Fader position for an active loop (drums or sample), ramped. */
   setGain(loopId: string, value: number): void {
-    const slot = this.drums.current?.id === loopId ? this.drums : this.samples.get(loopId)
+    const slot = this.slotFor(loopId)
     if (!slot) return
     slot.setGain(value)
+    this.applyMix()
     this.emit()
+  }
+
+  setMuted(loopId: string, muted: boolean): void {
+    const slot = this.slotFor(loopId)
+    if (!slot) return
+    slot.muted = muted
+    this.applyMix()
+    this.emit()
+  }
+
+  /** Solo any number of slots; while any is soloed, the others are silent. */
+  setSolo(loopId: string, solo: boolean): void {
+    const slot = this.slotFor(loopId)
+    if (!slot) return
+    slot.solo = solo
+    this.applyMix()
+    this.emit()
+  }
+
+  /** Every slot: ramp to its effective gain given the current mute/solo state. */
+  private applyMix(at?: number): void {
+    const slots = [this.drums, ...this.samples.values()]
+    const anySolo = slots.some((s) => s.solo && s.current)
+    for (const s of slots) s.applyGain(s.effectiveGain(anySolo), at)
   }
 
   /** Start everything, locked to the same timestamp. Call from a user gesture. */
@@ -134,6 +166,7 @@ export class Engine {
       const loop = slot.pending
       if (loop) slot.start(loop, at, this.transport.rateFor(loop.bpm))
     }
+    this.applyMix(at)
     this.emit()
   }
 
@@ -170,6 +203,7 @@ export class Engine {
     }
     const at = this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD)
     this.drums.swap(loaded, at, 1)
+    this.applyMix(at)
     if (loaded.bpm !== this.transport.masterBPM) {
       // Drums define tempo: re-anchor the grid and re-pitch every sample at
       // the same instant so everything stays locked.
@@ -188,9 +222,12 @@ export class Engine {
     const slot = new Slot(this.ctx, 'sample', this.master)
     this.samples.set(loop.id, slot)
     if (this.playing) {
-      slot.start(loaded, this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD), this.transport.rateFor(loaded.bpm))
+      const at = this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD)
+      slot.start(loaded, at, this.transport.rateFor(loaded.bpm))
+      this.applyMix(at)
     } else {
       slot.setPending(loaded)
+      this.applyMix()
     }
     this.emit()
   }
@@ -211,7 +248,7 @@ export class Engine {
   }
 
   private snapshot(): EngineState {
-    const s = (slot: Slot): SlotState => ({ loop: slot.loop, pending: slot.pending, gain: slot.level })
+    const s = (slot: Slot): SlotState => ({ loop: slot.loop, pending: slot.pending, gain: slot.level, muted: slot.muted, solo: slot.solo })
     return {
       playing: this.playing,
       masterBPM: this.transport.masterBPM,

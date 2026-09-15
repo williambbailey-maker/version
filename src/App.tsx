@@ -183,6 +183,8 @@ function Studio() {
           samples={engine.samples}
           onGain={onGain}
           onRemove={(loop) => engine.removeSample(loop.id)}
+          onMute={(loop, m) => engine.setMuted(loop.id, m)}
+          onSolo={(loop, v) => engine.setSolo(loop.id, v)}
         />
       </Section>
 

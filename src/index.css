@@ -7,6 +7,7 @@
   --color-ink: #111111;
   --color-muted: #6b6b6b;
   --color-line: #cfcac0;
+  --color-accent: #e4572e; /* sample faders and solo */
   --font-sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Space Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
@@ -94,6 +95,14 @@
   &:disabled {
     opacity: 0.35;
     cursor: default;
+  }
+}
+
+@utility pill-accent {
+  background: var(--color-accent);
+  color: var(--color-cream);
+  &:hover {
+    background: var(--color-ink);
   }
 }
 
