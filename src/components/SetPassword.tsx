@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
-import { Wordmark } from './Wordmark'
 
 type Props = { onDone: () => void }
 
@@ -23,12 +22,10 @@ export function SetPassword({ onDone }: Props) {
 
   return (
     <main className="min-h-screen bg-cream text-ink">
-      <header className="px-4 pt-4 md:px-6">
-        <Wordmark />
-        <div className="mono-label flex justify-between pt-2 text-muted">
-          <span>Loop auditioning</span>
-          <span>Recovery</span>
-        </div>
+      <header className="grid grid-cols-1 items-start gap-2 px-4 pt-5 text-center md:grid-cols-3 md:px-6 md:text-left">
+        <span className="mono-label text-muted">(a studio-shaped loop library)</span>
+        <span className="headline text-center text-3xl">LOOP LAB<span className="text-accent">.</span></span>
+        <span className="mono-label text-muted md:text-right">Recovery</span>
       </header>
       <section className="grid grid-cols-1 gap-10 px-4 py-12 md:grid-cols-2 md:px-6 md:py-20">
         <div className="flex flex-col items-start gap-1">

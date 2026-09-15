@@ -170,6 +170,27 @@ describe('Engine', () => {
     expect(targets()[0]).toBe(0.8)
   })
 
+  it('loadStack replaces the stack and applies saved levels', async () => {
+    const { engine, targets } = make()
+    await engine.select(loop('d', 'drums', 100))
+    await engine.select(loop('x', 'sample', 90))
+    await engine.play()
+    await engine.loadStack({
+      drums: loop('d2', 'drums', 120),
+      samples: [
+        { loop: loop('a', 'sample', 88), gain: 0.3, muted: false, solo: false },
+        { loop: loop('b', 'sample', 100), gain: 0.7, muted: true, solo: false },
+      ],
+    })
+    expect(engine.state.masterBPM).toBe(120)
+    expect(engine.state.samples.map((s) => [s.loop?.id, s.gain, s.muted])).toEqual([['a', 0.3, false], ['b', 0.7, true]])
+    expect(engine.isActive('x')).toBe(false)
+    // slot gain nodes: drums, x (disposed, target 0 irrelevant), a, b
+    const t = targets()
+    expect(t[t.length - 2]).toBe(0.3)
+    expect(t[t.length - 1]).toBe(0)
+  })
+
   it('honours a codec start offset', async () => {
     const { engine, calls } = make()
     await engine.select(loop('d', 'drums', 100))

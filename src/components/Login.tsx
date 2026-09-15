@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
-import { Mark } from './Mark'
-import { Wordmark } from './Wordmark'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -48,25 +46,18 @@ export function Login() {
 
   return (
     <main className="min-h-screen bg-cream text-ink">
-      <header className="px-4 pt-4 md:px-6">
-        <Wordmark />
-        <div className="mono-label flex justify-between pt-2 text-muted">
-          <span>Loop auditioning</span>
-          <span className="hidden sm:inline">Varispeed</span>
-          <span className="hidden sm:inline">Bar-quantized</span>
-          <span>Access</span>
-        </div>
+      <header className="grid grid-cols-1 items-start gap-2 px-4 pt-5 text-center md:grid-cols-3 md:px-6 md:text-left">
+        <span className="mono-label text-muted">(a studio-shaped loop library)</span>
+        <span className="headline text-center text-3xl">LOOP LAB<span className="text-accent">.</span></span>
+        <span className="mono-label text-muted md:text-right">Access</span>
       </header>
       <section className="grid grid-cols-1 gap-10 px-4 py-12 md:grid-cols-2 md:px-6 md:py-20">
-        <div className="flex items-start gap-4">
-          <Mark />
-          <div className="flex flex-col gap-1">
-            <span className="tag">Loop Lab</span>
-            <span className="tag">A private loop library</span>
-          </div>
+        <div className="flex flex-col gap-2">
+          <p className="caption">Less of a library, more of a jam.</p>
+          <p className="mono-label text-muted">Pull up a stool, stay a while.</p>
         </div>
         <div className="flex flex-col gap-8">
-          <h1 className="headline text-4xl md:text-5xl">Your loops, locked to your drums.</h1>
+          <h1 className="headline text-3xl md:text-4xl">Your loops, locked to your drums.</h1>
           <form onSubmit={signIn} className="grid max-w-md gap-4">
             <label className="mono-label flex flex-col gap-1 text-muted">
               Email

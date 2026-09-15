@@ -100,6 +100,26 @@ export class Engine {
     else await this.addSample(loop)
   }
 
+  /**
+   * Replace the whole stack: drums, the set of samples, and their levels.
+   * Bar-quantized while playing (everything changes on the same boundary).
+   */
+  async loadStack(stack: { drums: Loop | null; samples: { loop: Loop; gain: number; muted: boolean; solo: boolean }[] }): Promise<void> {
+    if (stack.drums) await this.selectDrums(stack.drums)
+    const keep = new Set(stack.samples.map((s) => s.loop.id))
+    for (const id of [...this.samples.keys()]) if (!keep.has(id)) this.removeSample(id)
+    for (const s of stack.samples) {
+      if (!this.samples.has(s.loop.id)) await this.addSample(s.loop)
+      const slot = this.samples.get(s.loop.id)
+      if (!slot) continue
+      slot.setGain(s.gain)
+      slot.muted = s.muted
+      slot.solo = s.solo
+    }
+    this.applyMix()
+    this.emit()
+  }
+
   /** Take a sample out (bar-quantized while playing). No-op if not active. */
   removeSample(loopId: string): void {
     const slot = this.samples.get(loopId)

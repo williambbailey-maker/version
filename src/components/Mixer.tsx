@@ -23,7 +23,7 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
   }
   const anySolo = cols.some((c) => c.slot.solo)
   if (cols.length === 0) {
-    return <p className="headline max-w-xl text-2xl md:text-3xl">Pick a drum loop, then tap samples to layer them. Each one enters on the next bar.</p>
+    return <p className="max-w-xl text-base leading-relaxed text-muted">Pick a drum loop, then tap samples to layer them. Each one enters on the next bar.</p>
   }
 
   return (

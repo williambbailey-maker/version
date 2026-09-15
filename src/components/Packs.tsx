@@ -42,14 +42,14 @@ export function Packs({ packs, stats, selected, onSelect, onEdit }: Props) {
                 <span className="mono-label pt-1 text-muted">{String(i + 1).padStart(3, '0')}</span>
                 <span className="hidden md:block">
                   {pack.coverUrl ? (
-                    <img src={pack.coverUrl} alt="" className="grain h-20 w-20 object-cover" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+                    <img src={pack.coverUrl} alt="" className="h-20 w-20 border-[1.5px] border-ink object-cover" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
                   ) : (
-                    <span className="grain block h-20 w-20 bg-ink" aria-hidden="true" />
+                    <span className="block h-20 w-20 border-[1.5px] border-ink" aria-hidden="true" />
                   )}
                 </span>
                 <div className="min-w-0">
                   <button type="button" onClick={() => onSelect(active ? null : pack.id)} aria-pressed={active} className="group text-left">
-                    <span className={['headline inline-block max-w-full truncate text-2xl md:text-3xl', active ? 'grain bg-ink px-2 text-cream' : 'group-hover:underline group-hover:underline-offset-4'].join(' ')}>
+                    <span className={['headline inline-block max-w-full truncate text-2xl md:text-3xl', active ? 'bg-ink px-2 text-cream' : 'group-hover:text-accent'].join(' ')}>
                       {pack.name}
                     </span>
                   </button>
