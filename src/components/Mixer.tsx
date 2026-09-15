@@ -29,7 +29,7 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove }: Props) {
         const ratio = masterBPM / loop.bpm
         return (
           <div key={loop.id} className="flex min-w-0 flex-col gap-2">
-            <StripeFader value={slot.gain} label={loop.name} onChange={(v) => onGain(loop, v)} />
+            <StripeFader value={slot.gain} label={loop.name} onChange={(v) => onGain(loop, v)} tone={loop.kind === 'drums' ? 'ink' : 'muted'} />
             <div className="mono-label flex items-baseline justify-between gap-2 text-muted">
               <span>{String(i + 1).padStart(2, '0')}</span>
               <span>{loop.kind === 'drums' ? `${loop.bpm} bpm` : `${ratio >= 1 ? '+' : ''}${Math.round((ratio - 1) * 100)}%`}</span>

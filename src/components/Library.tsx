@@ -42,6 +42,7 @@ export function Library(props: Props) {
   const [newBucket, setNewBucket] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [shown, setShown] = useState<Record<LoopKind, number>>({ drums: PAGE, sample: PAGE })
+  const [open, setOpen] = useState<Record<LoopKind, boolean>>({ drums: true, sample: true })
 
   const query = useMemo(() => parseQuery(q), [q])
 
@@ -77,13 +78,28 @@ export function Library(props: Props) {
   const section = (kind: LoopKind, title: string) => {
     const rows = filtered.filter((l) => l.kind === kind)
     const visible = rows.slice(0, shown[kind])
+    const isOpen = open[kind]
     return (
       <div>
-        <div className="flex items-baseline justify-between border-b border-ink pb-2">
-          <h2 className="headline text-3xl md:text-4xl">{title}</h2>
-          <span className="mono-label text-muted">{String(rows.length).padStart(3, '0')}</span>
-        </div>
-        {rows.length === 0 && <p className="mono-label py-6 text-muted">Nothing here.</p>}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => ({ ...o, [kind]: !o[kind] }))}
+          aria-expanded={isOpen}
+          className="flex w-full items-baseline justify-between border-b border-ink pb-2 text-left"
+        >
+          <h2 className="headline text-3xl md:text-4xl">
+            <span className="mr-3 inline-block text-xl transition-transform duration-200 ease-linear" style={{ transform: isOpen ? 'rotate(90deg)' : 'none' }} aria-hidden="true">
+              ▸
+            </span>
+            {title}
+          </h2>
+          <span className="mono-label text-muted">
+            {String(rows.length).padStart(3, '0')}
+            {!isOpen && ' · collapsed'}
+          </span>
+        </button>
+        {isOpen && rows.length === 0 && <p className="mono-label py-6 text-muted">Nothing here.</p>}
+        {isOpen && (
         <ul>
           {visible.map((loop, i) => {
             const active = isActive(loop)
@@ -147,7 +163,8 @@ export function Library(props: Props) {
             )
           })}
         </ul>
-        {rows.length > visible.length && (
+        )}
+        {isOpen && rows.length > visible.length && (
           <button type="button" onClick={() => setShown((s) => ({ ...s, [kind]: s[kind] + PAGE }))} className="pill pill-outline mt-4">
             Show more · {rows.length - visible.length} left
           </button>
