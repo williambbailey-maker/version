@@ -17,6 +17,8 @@ export type Loop = {
   startOffset?: number // seconds to skip at the start of the decoded buffer (codec priming)
   tags?: string[]
   bucketId?: string | null
+  packId?: string | null
+  category?: string | null // subfolder inside the pack
 }
 
 export type LoadedLoop = Loop & { buffer: AudioBuffer }

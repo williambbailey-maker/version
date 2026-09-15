@@ -33,6 +33,19 @@ whole library.
 length and an onset analysis, all editable), uploads the file as-is and adds it
 to the library. Use this for drum beats and one-offs from the phone.
 
+### Packs
+
+A pack is where a loop came from. Importers create packs from folder names:
+under the import root, the first folder is the pack and deeper folders become
+the loop's category (`Island Vibes/Drums/Loops/beat.wav` → pack "Island
+Vibes", category "Drums/Loops"). Importing a single pack folder directly uses
+that folder's name. The **Packs** section shows each pack with publisher,
+genres, description, link, your notes, and rollups (loop counts, tempo range,
+keys, folders); selecting one filters the library. Edit pack info in the app,
+or give the CLI importer a JSON file (`--packs packs.json`, see
+`scripts/packs.example.json`) to fill it in for many packs at once. Buckets
+remain your own collections, separate from packs.
+
 ### Bulk import from the browser (nothing to install)
 
 **Add loop → Many loops** in the app. Choose a folder (desktop browsers) or a
