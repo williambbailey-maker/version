@@ -119,7 +119,7 @@ export function Uploader({ buckets, onAdded }: Props) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <label className="flex min-h-14 cursor-pointer items-center border border-dashed border-jet px-4 label-caps text-jet">
+      <label className="pill pill-outline cursor-pointer self-start">
         <input
           type="file"
           accept="audio/*,.wav,.aif,.aiff,.m4a,.mp3"
@@ -129,29 +129,29 @@ export function Uploader({ buckets, onAdded }: Props) {
         {file ? file.name : 'Choose an audio file'}
       </label>
 
-      {detecting && <p className="font-mono text-xs text-muted">Detecting tempo…</p>}
-      {detected && !detecting && <p className="font-mono text-xs text-muted">Auto: {detected}. Edit anything below.</p>}
+      {detecting && <p className="mono-label text-muted">Detecting tempo…</p>}
+      {detected && !detecting && <p className="mono-label text-muted">Auto: {detected}. Edit anything below.</p>}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <label className="label-caps flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        <label className="mono-label flex flex-col gap-1 text-muted">
           Name
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="field text-base normal-case tracking-normal text-jet"
+            className="field text-ink"
           />
         </label>
-        <label className="label-caps flex flex-col gap-2">
+        <label className="mono-label flex flex-col gap-1 text-muted">
           BPM
           <input
             inputMode="decimal"
             value={bpm}
             onChange={(e) => onBpm(e.target.value)}
             placeholder="e.g. 92"
-            className="field font-mono text-base normal-case tracking-normal text-jet"
+            className="field text-ink"
           />
         </label>
-        <label className="label-caps flex flex-col gap-2">
+        <label className="mono-label flex flex-col gap-1 text-muted">
           Bars
           <select
             value={bars}
@@ -159,7 +159,7 @@ export function Uploader({ buckets, onAdded }: Props) {
               setBars(Number(e.target.value) as Bars)
               setBarsTouched(true)
             }}
-            className="field font-mono text-base normal-case tracking-normal text-jet"
+            className="field text-ink"
           >
             {BARS.map((b) => (
               <option key={b} value={b}>
@@ -168,32 +168,32 @@ export function Uploader({ buckets, onAdded }: Props) {
             ))}
           </select>
         </label>
-        <label className="label-caps flex flex-col gap-2">
+        <label className="mono-label flex flex-col gap-1 text-muted">
           Kind
           <select
             value={kind}
             onChange={(e) => setKind(e.target.value as LoopKind)}
-            className="field text-base normal-case tracking-normal text-jet"
+            className="field text-ink"
           >
             <option value="drums">drums</option>
             <option value="sample">sample</option>
           </select>
         </label>
-        <label className="label-caps flex flex-col gap-2">
+        <label className="mono-label flex flex-col gap-1 text-muted">
           Tags
           <input
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="reggae, guitar"
-            className="field text-base normal-case tracking-normal text-jet"
+            className="field text-ink"
           />
         </label>
-        <label className="label-caps flex flex-col gap-2">
+        <label className="mono-label flex flex-col gap-1 text-muted">
           Bucket
           <select
             value={bucketId}
             onChange={(e) => setBucketId(e.target.value)}
-            className="field text-base normal-case tracking-normal text-jet"
+            className="field text-ink"
           >
             <option value="">Unsorted</option>
             {buckets.map((b) => (
@@ -206,7 +206,7 @@ export function Uploader({ buckets, onAdded }: Props) {
       </div>
 
       {duration !== null && (
-        <p className={['font-mono text-xs', mismatch ? 'text-cobalt' : 'text-muted'].join(' ')}>
+        <p className={['mono-label', mismatch ? 'tag' : 'text-muted'].join(' ')}>
           file {duration.toFixed(2)}s
           {expected !== null && ` · ${bars} bar${bars > 1 ? 's' : ''} @ ${bpmNum} = ${expected.toFixed(2)}s`}
           {mismatch && ' · lengths differ; bpm + bars will be trusted'}
@@ -214,14 +214,10 @@ export function Uploader({ buckets, onAdded }: Props) {
       )}
 
       <div className="flex items-center gap-4">
-        <button
-          type="submit"
-          disabled={!file || !bpmOk || busy || detecting}
-          className="btn bg-cobalt text-cream hover:bg-jet disabled:opacity-40"
-        >
+        <button type="submit" disabled={!file || !bpmOk || busy || detecting} className="pill">
           {busy ? 'Uploading…' : 'Add to library'}
         </button>
-        {error && <p className="text-sm text-cobalt">{error}</p>}
+        {error && <p className="mono-label">{error}</p>}
       </div>
     </form>
   )

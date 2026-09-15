@@ -21,12 +21,7 @@ type Props = {
 const PAGE = 60
 const UNSORTED = '__unsorted__'
 
-const chipClass = (active: boolean, extra = '') =>
-  [
-    'label-caps min-h-10 border px-3 transition-colors duration-300 ease-linear',
-    active ? 'border-jet bg-jet text-cream' : 'border-line text-ink hover:border-jet',
-    extra,
-  ].join(' ')
+const pill = (active: boolean, extra = '') => ['pill', active ? '' : 'pill-outline', extra].join(' ')
 
 /** Searchable, taggable, bucketed list of the whole library. */
 export function Library(props: Props) {
@@ -73,11 +68,11 @@ export function Library(props: Props) {
     const visible = rows.slice(0, shown[kind])
     return (
       <div>
-        <h2 className="flex items-baseline justify-between border-b border-jet pb-2">
-          <span className="text-4xl font-bold leading-[0.9] tracking-[-0.03em] md:text-5xl">{title}</span>
-          <span className="font-mono text-sm text-muted">{String(rows.length).padStart(3, '0')}</span>
-        </h2>
-        {rows.length === 0 && <p className="py-6 text-lg text-ink">Nothing here.</p>}
+        <div className="flex items-baseline justify-between border-b border-ink pb-2">
+          <h2 className="headline text-3xl md:text-4xl">{title}</h2>
+          <span className="mono-label text-muted">{String(rows.length).padStart(3, '0')}</span>
+        </div>
+        {rows.length === 0 && <p className="mono-label py-6 text-muted">Nothing here.</p>}
         <ul>
           {visible.map((loop, i) => {
             const active = isActive(loop)
@@ -85,52 +80,41 @@ export function Library(props: Props) {
             const ratio = masterBPM / loop.bpm
             return (
               <li key={loop.id} className="border-b border-line">
-                <div
-                  className={[
-                    'group grid grid-cols-[3rem_1fr] items-start gap-x-3 transition-colors duration-300 ease-linear hover:bg-white/20 md:grid-cols-[3rem_1fr_auto_auto]',
-                    active ? 'bg-white/30' : '',
-                    loading ? 'opacity-60' : '',
-                  ].join(' ')}
-                >
-                  <span className="pt-4 font-mono text-xs text-muted">{String(i + 1).padStart(3, '0')}</span>
-                  <button type="button" onClick={() => onSelect(loop)} aria-pressed={active} className="min-w-0 py-4 text-left">
+                <div className={['grid grid-cols-[2.5rem_1fr] items-start gap-x-2 md:grid-cols-[2.5rem_1fr_auto_auto]', loading ? 'opacity-60' : ''].join(' ')}>
+                  <span className="mono-label pt-4 text-muted">{String(i + 1).padStart(3, '0')}</span>
+                  <button type="button" onClick={() => onSelect(loop)} aria-pressed={active} className="group min-w-0 py-3 text-left">
                     <span
                       className={[
-                        'block truncate text-2xl font-bold leading-[0.95] tracking-[-0.02em] transition-colors duration-300 ease-linear md:text-3xl',
-                        active ? 'text-cobalt' : 'group-hover:text-cobalt',
+                        'headline inline-block max-w-full truncate text-2xl md:text-3xl',
+                        active ? 'grain bg-ink px-2 text-cream' : 'group-hover:underline group-hover:underline-offset-4',
                       ].join(' ')}
                     >
                       {loop.name}
                     </span>
-                    <span className="label-caps mt-2 block truncate">
-                      {active ? <span className="text-cobalt">On · </span> : ''}
+                    <span className="mono-label mt-2 block truncate text-muted">
+                      {active ? <span className="text-ink">On · </span> : ''}
                       {loop.pack ?? ''}
                       {(loop.tags ?? []).map((t) => (
                         <span key={t} className="ml-2">#{t}</span>
                       ))}
                     </span>
                   </button>
-                  <span className="col-start-2 pb-4 font-mono text-sm md:col-start-auto md:py-4 md:text-right">
-                    {loop.bpm} · {loop.bars}B{loop.key ? ` · ${loop.key.toUpperCase()}` : ''}
+                  <span className="mono-label col-start-2 pb-3 md:col-start-auto md:py-4 md:text-right">
+                    {loop.bpm} · {loop.bars}b{loop.key ? ` · ${loop.key}` : ''}
                     {kind === 'sample' && <span className="ml-3 md:ml-0 md:block">{ratio >= 1 ? '+' : ''}{Math.round((ratio - 1) * 100)}%</span>}
                   </span>
-                  <span className="col-start-2 flex gap-4 pb-4 md:col-start-auto md:py-4 md:pl-4">
+                  <span className="col-start-2 flex gap-2 pb-3 md:col-start-auto md:py-4 md:pl-4">
                     {loop.storagePath && (
                       <button
                         type="button"
                         aria-label={`Edit ${loop.name}`}
                         onClick={() => setEditing(editing === loop.id ? null : loop.id)}
-                        className="label-caps transition-colors duration-300 ease-linear hover:text-cobalt"
+                        className="pill pill-outline min-h-7 px-3"
                       >
                         Edit
                       </button>
                     )}
-                    <button
-                      type="button"
-                      aria-label={`Remove ${loop.name}`}
-                      onClick={() => onRemove(loop)}
-                      className="label-caps transition-colors duration-300 ease-linear hover:text-cobalt"
-                    >
+                    <button type="button" aria-label={`Remove ${loop.name}`} onClick={() => onRemove(loop)} className="pill pill-outline min-h-7 px-3">
                       {active && kind === 'sample' ? 'Out' : 'Del'}
                     </button>
                   </span>
@@ -151,11 +135,7 @@ export function Library(props: Props) {
           })}
         </ul>
         {rows.length > visible.length && (
-          <button
-            type="button"
-            onClick={() => setShown((s) => ({ ...s, [kind]: s[kind] + PAGE }))}
-            className="label-caps mt-4 border border-line px-4 py-3 transition-colors duration-300 ease-linear hover:border-jet"
-          >
+          <button type="button" onClick={() => setShown((s) => ({ ...s, [kind]: s[kind] + PAGE }))} className="pill pill-outline mt-4">
             Show more · {rows.length - visible.length} left
           </button>
         )}
@@ -165,68 +145,44 @@ export function Library(props: Props) {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
-        <div className="flex gap-2">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search · #tag to filter by tag"
-            className="field min-w-0 flex-1"
-          />
-          <input value={minBpm} onChange={(e) => setMinBpm(e.target.value)} placeholder="MIN" inputMode="numeric" className="field w-20 font-mono text-sm" />
-          <input value={maxBpm} onChange={(e) => setMaxBpm(e.target.value)} placeholder="MAX" inputMode="numeric" className="field w-20 font-mono text-sm" />
+      <div className="flex flex-col gap-4">
+        <div className="flex gap-4">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="SEARCH · #TAG TO FILTER BY TAG" className="field min-w-0 flex-1" />
+          <input value={minBpm} onChange={(e) => setMinBpm(e.target.value)} placeholder="MIN" inputMode="numeric" className="field w-16" />
+          <input value={maxBpm} onChange={(e) => setMaxBpm(e.target.value)} placeholder="MAX" inputMode="numeric" className="field w-16" />
         </div>
 
-        <div className="flex flex-wrap items-stretch gap-2">
-          <button type="button" onClick={() => setBucket(null)} className={chipClass(bucket === null)}>All</button>
-          <button type="button" onClick={() => setBucket(UNSORTED)} className={chipClass(bucket === UNSORTED)}>Unsorted</button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setBucket(null)} className={pill(bucket === null)}>All</button>
+          <button type="button" onClick={() => setBucket(UNSORTED)} className={pill(bucket === UNSORTED)}>Unsorted</button>
           {buckets.map((b) => (
             <span key={b.id} className="flex">
-              <button type="button" onClick={() => setBucket(bucket === b.id ? null : b.id)} className={chipClass(bucket === b.id, 'border-r-0')}>
+              <button type="button" onClick={() => setBucket(bucket === b.id ? null : b.id)} className={pill(bucket === b.id, 'rounded-r-none pr-2')}>
                 {b.name}
               </button>
-              <button
-                type="button"
-                aria-label={`Delete bucket ${b.name}`}
-                onClick={() => onDeleteBucket(b)}
-                className={chipClass(bucket === b.id, 'px-2')}
-              >
+              <button type="button" aria-label={`Delete bucket ${b.name}`} onClick={() => onDeleteBucket(b)} className={pill(bucket === b.id, 'rounded-l-none pl-2 pr-3')}>
                 ×
               </button>
             </span>
           ))}
           {newBucket === null ? (
-            <button type="button" onClick={() => setNewBucket('')} className={chipClass(false, 'border-dashed')}>
+            <button type="button" onClick={() => setNewBucket('')} className="pill pill-outline">
               + New bucket
             </button>
           ) : (
-            <form onSubmit={submitBucket} className="flex gap-2">
-              <input
-                autoFocus
-                value={newBucket}
-                onChange={(e) => setNewBucket(e.target.value)}
-                placeholder="Bucket name"
-                className="field min-h-10 w-40 text-sm"
-              />
-              <button type="submit" className="btn bg-cobalt px-4 py-0 text-cream hover:bg-jet">Add</button>
-              <button type="button" onClick={() => setNewBucket(null)} className="label-caps px-2 hover:text-cobalt">Cancel</button>
+            <form onSubmit={submitBucket} className="flex items-end gap-2">
+              <input autoFocus value={newBucket} onChange={(e) => setNewBucket(e.target.value)} placeholder="BUCKET NAME" className="field min-h-8 w-40 py-1" />
+              <button type="submit" className="pill">Add</button>
+              <button type="button" onClick={() => setNewBucket(null)} className="pill pill-outline">Cancel</button>
             </form>
           )}
         </div>
 
         {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
             {tags.map(([t, n]) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => toggleTag(t)}
-                className={[
-                  'font-mono text-xs transition-colors duration-300 ease-linear',
-                  query.tags.includes(t) ? 'text-cobalt' : 'text-ink hover:text-cobalt',
-                ].join(' ')}
-              >
-                #{t} <span className="text-muted">{n}</span>
+              <button key={t} type="button" onClick={() => toggleTag(t)} className={['mono-label', query.tags.includes(t) ? 'tag' : 'text-ink hover:underline'].join(' ')}>
+                #{t} <span className="opacity-60">{n}</span>
               </button>
             ))}
           </div>
@@ -239,17 +195,7 @@ export function Library(props: Props) {
   )
 }
 
-function LoopEditor({
-  loop,
-  buckets,
-  onSave,
-  onCancel,
-}: {
-  loop: Loop
-  buckets: Bucket[]
-  onSave: (patch: LoopPatch) => Promise<void>
-  onCancel: () => void
-}) {
+function LoopEditor({ loop, buckets, onSave, onCancel }: { loop: Loop; buckets: Bucket[]; onSave: (patch: LoopPatch) => Promise<void>; onCancel: () => void }) {
   const [name, setName] = useState(loop.name)
   const [tags, setTags] = useState((loop.tags ?? []).join(', '))
   const [bucketId, setBucketId] = useState<string>(loop.bucketId ?? '')
@@ -270,33 +216,28 @@ function LoopEditor({
   }
 
   return (
-    <form onSubmit={submit} className="grid grid-cols-1 gap-3 border-t border-line py-4 md:grid-cols-3">
-      <label className="label-caps flex flex-col gap-2">
+    <form onSubmit={submit} className="grid grid-cols-1 gap-4 border-t border-line py-4 md:grid-cols-3">
+      <label className="mono-label flex flex-col gap-1 text-muted">
         Name
-        <input value={name} onChange={(e) => setName(e.target.value)} className="field text-base normal-case tracking-normal text-jet" />
+        <input value={name} onChange={(e) => setName(e.target.value)} className="field text-ink" />
       </label>
-      <label className="label-caps flex flex-col gap-2">
+      <label className="mono-label flex flex-col gap-1 text-muted">
         Tags
-        <input
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          placeholder="reggae, guitar, warm"
-          className="field text-base normal-case tracking-normal text-jet"
-        />
+        <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="reggae, guitar, warm" className="field text-ink" />
       </label>
-      <label className="label-caps flex flex-col gap-2">
+      <label className="mono-label flex flex-col gap-1 text-muted">
         Bucket
-        <select value={bucketId} onChange={(e) => setBucketId(e.target.value)} className="field text-base normal-case tracking-normal text-jet">
+        <select value={bucketId} onChange={(e) => setBucketId(e.target.value)} className="field text-ink">
           <option value="">Unsorted</option>
           {buckets.map((b) => (
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}
         </select>
       </label>
-      <div className="flex items-center gap-4 md:col-span-3">
-        <button type="submit" disabled={busy} className="btn bg-jet text-cream hover:bg-cobalt disabled:opacity-40">Save</button>
-        <button type="button" onClick={onCancel} className="label-caps hover:text-cobalt">Cancel</button>
-        {error && <p className="text-sm text-cobalt">{error}</p>}
+      <div className="flex items-center gap-2 md:col-span-3">
+        <button type="submit" disabled={busy} className="pill">Save</button>
+        <button type="button" onClick={onCancel} className="pill pill-outline">Cancel</button>
+        {error && <p className="mono-label text-ink">{error}</p>}
       </div>
     </form>
   )
