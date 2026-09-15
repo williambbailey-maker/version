@@ -22,6 +22,8 @@ export class Slot {
   private _pending: LoadedLoop | null = null
   private _gain = 1
   private gainFor: string | null = null // loop id the remembered gain belongs to
+  muted = false
+  solo = false
 
   constructor(ctx: BaseAudioContext, kind: LoopKind, destination: AudioNode) {
     this.ctx = ctx
@@ -94,7 +96,7 @@ export class Slot {
     this._loop = loop
     this._pending = null
     this.rememberGain(loop)
-    this.setGain(this._gain, at)
+    // The engine applies the effective (mute/solo-aware) gain right after start().
   }
 
   /** Bar-quantized replacement. Alias of start(); kept for readability at call sites. */
@@ -127,10 +129,21 @@ export class Slot {
     this.stopNode(at, () => this.gain.disconnect())
   }
 
-  setGain(value: number, at: number = this.ctx.currentTime): void {
+  /** Fader position only; call the engine's applyMix() to make it audible. */
+  setGain(value: number): void {
     this._gain = Math.max(0, Math.min(1, value))
-    // Ramp, never set .value while playing.
-    this.gain.gain.setTargetAtTime(this._gain, at, GAIN_TAU)
+  }
+
+  /** What this slot should output given the mute/solo state of the whole mix. */
+  effectiveGain(anySolo: boolean): number {
+    if (this.muted) return 0
+    if (anySolo && !this.solo) return 0
+    return this._gain
+  }
+
+  /** Ramp the gain node to `value` at `at`; never sets .value directly while playing. */
+  applyGain(value: number, at: number = this.ctx.currentTime): void {
+    this.gain.gain.setTargetAtTime(value, at, GAIN_TAU)
   }
 
   private stopNode(at: number, onEnded?: () => void): void {
