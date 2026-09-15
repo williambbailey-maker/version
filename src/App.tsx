@@ -122,7 +122,7 @@ function Studio() {
   return (
     <main className="min-h-screen bg-cream text-jet">
       <header className="sticky top-0 z-10 grid h-20 grid-cols-2 items-center border-b border-line bg-cream/95 px-4 backdrop-blur md:grid-cols-12 md:px-6">
-        <span className="text-lg font-bold uppercase tracking-[-0.02em] md:col-span-3">Loop Lab</span>
+        <span className="text-[2.25rem] font-bold uppercase leading-none tracking-[-0.03em] md:col-span-3">Loop Lab</span>
         <span className="hidden font-mono text-xs uppercase tracking-[0.2em] text-muted md:col-span-6 md:block">
           {engine.playing ? (
             <>
