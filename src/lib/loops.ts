@@ -160,27 +160,42 @@ const EXT_MIME: Record<string, string> = {
 
 /** Upload a file as-is and register it. Returns the Loop (with `buffer` if given). */
 export async function uploadLoop(file: File, meta: NewLoopMeta, buffer?: AudioBuffer | null): Promise<Loop> {
+  const ext = (file.name.split('.').pop() ?? 'wav').toLowerCase()
+  return uploadBlob(file, ext, file.type || EXT_MIME[ext] || 'application/octet-stream', meta, buffer)
+}
+
+export type SourceMeta = { sourcePath?: string | null; pack?: string | null }
+
+/**
+ * Upload any audio blob under "<uid>/<id>.<ext>" and register it. `ext` may
+ * be compound ("web.mp3") to mark browser-encoded previews for calibration.
+ */
+export async function uploadBlob(
+  blob: Blob,
+  ext: string,
+  contentType: string,
+  meta: NewLoopMeta & SourceMeta,
+  buffer?: AudioBuffer | null,
+): Promise<Loop> {
   const uid = await currentUserId()
   const id = crypto.randomUUID()
-  const ext = (file.name.split('.').pop() ?? 'wav').toLowerCase()
   const path = `${uid}/${id}.${ext}`
 
-  const up = await supabase.storage.from(BUCKET).upload(path, file, {
-    contentType: file.type || EXT_MIME[ext] || 'application/octet-stream',
-    upsert: false,
-  })
+  const up = await supabase.storage.from(BUCKET).upload(path, blob, { contentType, upsert: false })
   if (up.error) throw new Error(`Upload failed: ${up.error.message}`)
 
   const row = {
     id,
     name: meta.name,
     storage_path: path,
+    source_path: meta.sourcePath ?? null,
+    pack: meta.pack ?? null,
     bpm: meta.bpm,
     bars: meta.bars,
     kind: meta.kind,
     key: meta.key ?? null,
     duration: meta.duration ?? buffer?.duration ?? null,
-    size_bytes: file.size,
+    size_bytes: blob.size,
     tags: normalizeTags(meta.tags ?? []),
     bucket_id: meta.bucketId ?? null,
   }
@@ -192,6 +207,25 @@ export async function uploadLoop(file: File, meta: NewLoopMeta, buffer?: AudioBu
   const loop = fromRow(ins.data as LoopRow)
   if (buffer) loop.buffer = buffer
   return loop
+}
+
+/** Source paths already imported (for skipping reruns). */
+export async function existingSourcePaths(): Promise<Set<string>> {
+  const out = new Set<string>()
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from('loops').select('source_path').range(from, from + 999)
+    if (error) throw new Error(error.message)
+    for (const r of data as { source_path: string | null }[]) if (r.source_path) out.add(r.source_path)
+    if (data.length < 1000) break
+  }
+  return out
+}
+
+/** Upload (upsert) a calibration click for a codec key, e.g. "web.mp3". */
+export async function uploadCalibration(key: string, blob: Blob, contentType: string): Promise<void> {
+  const uid = await currentUserId()
+  const { error } = await supabase.storage.from(BUCKET).upload(`${uid}/calibration/click.${key}`, blob, { contentType, upsert: true })
+  if (error) throw new Error(`Calibration upload failed: ${error.message}`)
 }
 
 export async function deleteLoop(loop: Loop): Promise<void> {

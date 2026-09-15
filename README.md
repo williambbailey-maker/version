@@ -33,7 +33,19 @@ whole library.
 length and an onset analysis, all editable), uploads the file as-is and adds it
 to the library. Use this for drum beats and one-offs from the phone.
 
-### Bulk import (your Splice folder)
+### Bulk import from the browser (nothing to install)
+
+**Add loop → Many loops** in the app. Choose a folder (desktop browsers) or a
+batch of files, set an optional bucket, tags and kind, and press Import. Each
+file is decoded in the browser, its tempo detected, encoded to an MP3 preview
+in a Web Worker, uploaded and registered. Files already imported (by relative
+path) are skipped, so re-importing a folder only adds new ones. Files with no
+detectable tempo get a BPM box to fill in, then import on the next run.
+
+Browser-encoded previews carry ~25 ms of codec priming; the app uploads a
+calibration click encoded the same way and cancels the offset on playback.
+
+### Bulk import from the desktop (optional, needs ffmpeg)
 
 ```sh
 brew install ffmpeg                      # once
