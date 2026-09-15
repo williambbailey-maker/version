@@ -48,6 +48,8 @@ export class Engine {
   private error: string | null = null
   /** Scheduled stop boundary, if a bar-quantized stop is in flight. */
   private stopAt: number | null = null
+  /** The drum loop still being fetched/decoded, so play() can wait for it. */
+  private drumsLoading: Promise<unknown> | null = null
   private _state: EngineState
 
   constructor(ctx: AudioContext = getContext()) {
@@ -98,6 +100,26 @@ export class Engine {
     if (loop.kind === 'drums') return this.selectDrums(loop)
     if (this.samples.has(loop.id)) this.removeSample(loop.id)
     else await this.addSample(loop)
+  }
+
+  /**
+   * Replace the whole stack: drums, the set of samples, and their levels.
+   * Bar-quantized while playing (everything changes on the same boundary).
+   */
+  async loadStack(stack: { drums: Loop | null; samples: { loop: Loop; gain: number; muted: boolean; solo: boolean }[] }): Promise<void> {
+    if (stack.drums) await this.selectDrums(stack.drums)
+    const keep = new Set(stack.samples.map((s) => s.loop.id))
+    for (const id of [...this.samples.keys()]) if (!keep.has(id)) this.removeSample(id)
+    for (const s of stack.samples) {
+      if (!this.samples.has(s.loop.id)) await this.addSample(s.loop)
+      const slot = this.samples.get(s.loop.id)
+      if (!slot) continue
+      slot.setGain(s.gain)
+      slot.muted = s.muted
+      slot.solo = s.solo
+    }
+    this.applyMix()
+    this.emit()
   }
 
   /** Take a sample out (bar-quantized while playing). No-op if not active. */
@@ -151,6 +173,8 @@ export class Engine {
   async play(): Promise<void> {
     if (this.playing) return
     await ensureRunning(this.ctx)
+    if (this.drumsLoading) await this.drumsLoading.catch(() => {})
+    if (this.playing) return
     const drums = this.drums.pending
     if (!drums) throw new Error('Choose a drum loop before pressing play')
 
@@ -194,7 +218,14 @@ export class Engine {
 
   private async selectDrums(loop: Loop): Promise<void> {
     if (this.drums.current?.id === loop.id) return
-    const loaded = await this.load(loop)
+    const loading = this.load(loop)
+    this.drumsLoading = loading
+    let loaded: LoadedLoop
+    try {
+      loaded = await loading
+    } finally {
+      if (this.drumsLoading === loading) this.drumsLoading = null
+    }
     if (!this.playing) {
       this.drums.setPending(loaded)
       this.transport.setMasterBPM(loaded.bpm)

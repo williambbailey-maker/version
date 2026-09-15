@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Loop, LoopKind } from '../engine/types'
 import type { Bucket, LoopPatch, Pack } from '../lib/loops'
 import { parseTagInput } from '../lib/loops'
 import { matches, parseQuery, tagCounts } from '../lib/search'
+
+/** Applied when it changes: lets the studio open "#percussion, closest tempo first". */
+export type LibraryPreset = { query: string; sort: 'name' | 'tempo'; nonce: number }
 
 type Props = {
   loops: Loop[]
@@ -11,6 +14,7 @@ type Props = {
   packs: Pack[]
   packFilter: string | null
   onPackFilter: (id: string | null) => void
+  preset?: LibraryPreset | null
   masterBPM: number
   isActive: (loop: Loop) => boolean
   loadingIds: readonly string[]
@@ -28,7 +32,7 @@ const pill = (active: boolean, extra = '') => ['pill', active ? '' : 'pill-outli
 
 /** Searchable, taggable, bucketed list of the whole library. */
 export function Library(props: Props) {
-  const { loops, buckets, packs, packFilter, onPackFilter, masterBPM, isActive, loadingIds, onSelect, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
+  const { loops, buckets, packs, packFilter, onPackFilter, preset, masterBPM, isActive, loadingIds, onSelect, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
   const packById = useMemo(() => new Map(packs.map((p) => [p.id, p])), [packs])
   const extra = (l: Loop) => {
     const p = l.packId ? packById.get(l.packId) : undefined
@@ -43,10 +47,22 @@ export function Library(props: Props) {
   const [editing, setEditing] = useState<string | null>(null)
   const [shown, setShown] = useState<Record<LoopKind, number>>({ drums: PAGE, sample: PAGE })
   const [open, setOpen] = useState<Record<LoopKind, boolean>>({ drums: true, sample: true })
+  const [key, setKey] = useState<string | null>(null)
+  const [tight, setTight] = useState(false) // ≤ 20% stretch
+  const [sort, setSort] = useState<'name' | 'tempo'>('name')
+
+  useEffect(() => {
+    if (!preset) return
+    setQ(preset.query)
+    setSort(preset.sort)
+    setOpen({ drums: true, sample: true })
+  }, [preset])
 
   const query = useMemo(() => parseQuery(q), [q])
+  const stretch = (l: Loop) => Math.abs(masterBPM / l.bpm - 1)
 
-  const filtered = useMemo(() => {
+  // Everything but the key filter, so the key chips reflect what's in view.
+  const base = useMemo(() => {
     const lo = Number(minBpm) || 0
     const hi = Number(maxBpm) || Infinity
     return loops.filter((l) => {
@@ -54,10 +70,24 @@ export function Library(props: Props) {
       if (bucket === UNSORTED && l.bucketId) return false
       if (bucket && bucket !== UNSORTED && l.bucketId !== bucket) return false
       if (packFilter && l.packId !== packFilter) return false
+      if (tight && l.kind === 'sample' && stretch(l) > 0.2) return false
       return matches(l, query, extra)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loops, query, minBpm, maxBpm, bucket, packFilter, packById])
+  }, [loops, query, minBpm, maxBpm, bucket, packFilter, packById, tight, masterBPM])
+
+  const keys = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const l of base) if (l.key) m.set(l.key, (m.get(l.key) ?? 0) + 1)
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [base])
+
+  const filtered = useMemo(() => {
+    const rows = key ? base.filter((l) => l.key === key) : base
+    if (sort !== 'tempo') return rows
+    return [...rows].sort((a, b) => (a.kind === 'sample' && b.kind === 'sample' ? stretch(a) - stretch(b) : 0))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, key, sort, masterBPM])
 
   const tags = useMemo(() => tagCounts(filtered).slice(0, 24), [filtered])
 
@@ -113,7 +143,7 @@ export function Library(props: Props) {
                     <span
                       className={[
                         'headline inline-block max-w-full truncate text-2xl md:text-3xl',
-                        active ? 'grain bg-ink px-2 text-cream' : 'group-hover:underline group-hover:underline-offset-4',
+                        active ? 'bg-ink px-2 text-cream' : 'group-hover:text-accent',
                       ].join(' ')}
                     >
                       {loop.name}
@@ -128,8 +158,12 @@ export function Library(props: Props) {
                     </span>
                   </button>
                   <span className="mono-label col-start-2 pb-3 md:col-start-auto md:py-4 md:text-right">
-                    {loop.bpm} · {loop.bars}b{loop.key ? ` · ${loop.key}` : ''}
-                    {kind === 'sample' && <span className="ml-3 md:ml-0 md:block">{ratio >= 1 ? '+' : ''}{Math.round((ratio - 1) * 100)}%</span>}
+                    {kind === 'drums' ? `${loop.bpm} · ${loop.bars}b` : `${loop.bpm}${loop.key ? ` · ${loop.key}` : ''}`}
+                    {kind === 'sample' && (
+                      <span className={['ml-3 md:ml-0 md:block', Math.abs(ratio - 1) > 0.2 ? 'text-accent' : ''].join(' ')}>
+                        {ratio >= 1 ? '+' : ''}{Math.round((ratio - 1) * 100)}%
+                      </span>
+                    )}
                   </span>
                   <span className="col-start-2 flex gap-2 pb-3 md:col-start-auto md:py-4 md:pl-4">
                     {loop.storagePath && (
@@ -185,9 +219,9 @@ export function Library(props: Props) {
         {selectedPack && (
           <div className="flex gap-4 border border-line p-4">
             {selectedPack.coverUrl ? (
-              <img src={selectedPack.coverUrl} alt="" className="grain h-24 w-24 shrink-0 object-cover" />
+              <img src={selectedPack.coverUrl} alt="" className="h-24 w-24 shrink-0 border-[1.5px] border-ink object-cover" />
             ) : (
-              <span className="grain block h-24 w-24 shrink-0 bg-ink" aria-hidden="true" />
+              <span className="block h-24 w-24 shrink-0 border-[1.5px] border-ink" aria-hidden="true" />
             )}
             <div className="flex min-w-0 flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -230,6 +264,26 @@ export function Library(props: Props) {
               <button type="submit" className="pill">Add</button>
               <button type="button" onClick={() => setNewBucket(null)} className="pill pill-outline">Cancel</button>
             </form>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setTight((v) => !v)} aria-pressed={tight} className={pill(tight)} title="Only samples within 20% of the drum tempo">
+            ≤ 20% stretch
+          </button>
+          <button type="button" onClick={() => setSort((v) => (v === 'tempo' ? 'name' : 'tempo'))} aria-pressed={sort === 'tempo'} className={pill(sort === 'tempo')}>
+            Closest tempo first
+          </button>
+          {keys.length > 0 && (
+            <>
+              <span className="mono-label ml-2 text-muted">Key</span>
+              <button type="button" onClick={() => setKey(null)} className={pill(key === null, 'min-h-7 px-3')}>Any</button>
+              {keys.map(([k, n]) => (
+                <button key={k} type="button" onClick={() => setKey(key === k ? null : k)} className={pill(key === k, 'min-h-7 px-3')}>
+                  {k} <span className="ml-1 opacity-60">{n}</span>
+                </button>
+              ))}
+            </>
           )}
         </div>
 

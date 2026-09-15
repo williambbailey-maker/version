@@ -170,6 +170,42 @@ describe('Engine', () => {
     expect(targets()[0]).toBe(0.8)
   })
 
+  it('loadStack replaces the stack and applies saved levels', async () => {
+    const { engine, targets } = make()
+    await engine.select(loop('d', 'drums', 100))
+    await engine.select(loop('x', 'sample', 90))
+    await engine.play()
+    await engine.loadStack({
+      drums: loop('d2', 'drums', 120),
+      samples: [
+        { loop: loop('a', 'sample', 88), gain: 0.3, muted: false, solo: false },
+        { loop: loop('b', 'sample', 100), gain: 0.7, muted: true, solo: false },
+      ],
+    })
+    expect(engine.state.masterBPM).toBe(120)
+    expect(engine.state.samples.map((s) => [s.loop?.id, s.gain, s.muted])).toEqual([['a', 0.3, false], ['b', 0.7, true]])
+    expect(engine.isActive('x')).toBe(false)
+    // slot gain nodes: drums, x (disposed, target 0 irrelevant), a, b
+    const t = targets()
+    expect(t[t.length - 2]).toBe(0.3)
+    expect(t[t.length - 1]).toBe(0)
+  })
+
+  it('play() waits for a drum loop that is still loading', async () => {
+    const { engine } = make()
+    const slow = loop('d', 'drums', 100)
+    delete (slow as { buffer?: unknown }).buffer
+    let release: (b: AudioBuffer) => void = () => {}
+    engine.loader.buffer = () => new Promise<AudioBuffer>((r) => (release = r))
+    const selecting = engine.select(slow)
+    const playing = engine.play()
+    release({ id: 'd', duration: 4.8, length: 1, sampleRate: 44100 } as unknown as AudioBuffer)
+    await selecting
+    await playing
+    expect(engine.playing).toBe(true)
+    expect(engine.state.drums.loop?.id).toBe('d')
+  })
+
   it('honours a codec start offset', async () => {
     const { engine, calls } = make()
     await engine.select(loop('d', 'drums', 100))

@@ -1,22 +1,24 @@
 import type { ReactNode } from 'react'
 
 type Props = {
-  index: string
   label: string
   sub?: string
   children: ReactNode
   id?: string
+  /** Optional controls rendered at the right of the caption. */
+  aside?: ReactNode
 }
 
-/** Section with the stacked tag-block label, as in "ABOUT CASSETTE / A MUSIC CURATION AGENCY". */
-export function Section({ index, label, sub, children, id }: Props) {
+/** A section captioned like the reference: "● EACH MUG IS A PROJECT. GET A TASTE." */
+export function Section({ label, sub, children, id, aside }: Props) {
   return (
-    <section id={id} className="border-t border-line px-4 py-8 md:px-6 md:py-12">
-      <div className="mb-6 flex flex-col items-start gap-1">
-        <span className="tag">
-          {index} {label}
-        </span>
-        {sub && <span className="tag">{sub}</span>}
+    <section id={id} className="scroll-mt-4 border-t border-line px-4 py-8 md:px-6 md:py-10">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="caption">
+          {label}
+          {sub ? `. ${sub}.` : '.'}
+        </p>
+        {aside}
       </div>
       {children}
     </section>
