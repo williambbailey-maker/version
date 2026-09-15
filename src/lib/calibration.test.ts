@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CLICK_AT_SEC, offsetFromClick } from './calibration'
+import { CLICK_AT_SEC, codecKey, offsetFromClick } from './calibration'
 
 const SR = 44100
 
@@ -25,5 +25,15 @@ describe('offsetFromClick', () => {
   })
   it('is zero for silence', () => {
     expect(offsetFromClick(new Float32Array(SR), SR)).toBe(0)
+  })
+})
+
+describe('codecKey', () => {
+  it('distinguishes browser-encoded previews from ffmpeg ones', () => {
+    expect(codecKey('uid/abc.mp3')).toBe('mp3')
+    expect(codecKey('uid/abc.web.mp3')).toBe('web.mp3')
+    expect(codecKey('uid/abc.m4a')).toBe('m4a')
+    expect(codecKey('https://x/y/uid/abc.web.mp3?token=1')).toBe('web.mp3')
+    expect(codecKey('/dev/drums-100.wav')).toBe('wav')
   })
 })

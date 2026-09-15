@@ -15,7 +15,18 @@ const IGNORE_BELOW_SEC = 0.002
 
 const cached = new Map<string, Promise<number>>()
 
-/** Start offset for previews with the given extension ("mp3", "m4a"). */
+/**
+ * Which calibration click a loop needs: previews encoded in the browser
+ * ("<id>.web.mp3") have different priming from ffmpeg's, so they get their
+ * own key. Returns e.g. "mp3", "m4a" or "web.mp3".
+ */
+export function codecKey(storagePathOrUrl: string): string {
+  const name = storagePathOrUrl.split('?')[0]!.split('/').pop() ?? ''
+  const m = name.match(/\.(web\.mp3|[a-z0-9]+)$/i)
+  return (m?.[1] ?? '').toLowerCase()
+}
+
+/** Start offset for previews with the given codec key ("mp3", "m4a", "web.mp3"). */
 export function codecStartOffset(ext: string): Promise<number> {
   let p = cached.get(ext)
   if (!p) {
@@ -35,8 +46,9 @@ async function measure(ext: string): Promise<number> {
 }
 
 /**
- * Where the click's peak landed vs where it was written. The peak (not a
- * threshold crossing) is used so codec pre-echo can't trigger early.
+ * Where the click landed vs where it was written. Finds the peak, then walks
+ * back to the first sample above half of it, so the 8-sample click reads at
+ * its start while codec pre-echo (much quieter) can't trigger early.
  */
 export function offsetFromClick(samples: Float32Array, sampleRate: number): number {
   let peak = 0
@@ -49,6 +61,7 @@ export function offsetFromClick(samples: Float32Array, sampleRate: number): numb
     }
   }
   if (at < 0 || peak < 0.1) return 0
+  while (at > 0 && Math.abs(samples[at - 1] ?? 0) >= peak * 0.5) at--
   const off = at / sampleRate - CLICK_AT_SEC
   return off < IGNORE_BELOW_SEC ? 0 : off
 }

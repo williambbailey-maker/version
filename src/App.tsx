@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Library } from './components/Library'
+import { BulkImport } from './components/BulkImport'
 import { Login } from './components/Login'
 import { Mark } from './components/Mark'
 import { Section } from './components/Section'
@@ -11,9 +12,9 @@ import { useBar } from './hooks/useBar'
 import { useEngine } from './hooks/useEngine'
 import { getEngine } from './engine/engine'
 import { useSession } from './hooks/useSession'
-import { codecStartOffset } from './lib/calibration'
+import { codecKey, codecStartOffset } from './lib/calibration'
 import { DEV_LOOPS } from './lib/devLoops'
-import { createBucket, deleteBucket, deleteLoop, ensureUrl, fileExt, isCompressed, listBuckets, listLoops, updateLoop } from './lib/loops'
+import { createBucket, deleteBucket, deleteLoop, ensureUrl, isCompressed, listBuckets, listLoops, updateLoop } from './lib/loops'
 import type { Bucket, LoopPatch } from './lib/loops'
 import { supabase } from './lib/supabase'
 import type { Loop } from './engine/types'
@@ -32,6 +33,7 @@ function Studio() {
   const [buckets, setBuckets] = useState<Bucket[]>([])
   const [error, setError] = useState<string | null>(null)
   const [showUploader, setShowUploader] = useState(false)
+  const [addMode, setAddMode] = useState<'one' | 'many'>('many')
   const gainTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const bar = useBar(getEngine(), engine.playing)
 
@@ -56,7 +58,7 @@ function Studio() {
       try {
         setError(null)
         await ensureUrl(loop)
-        if (isCompressed(loop) && loop.startOffset === undefined) loop.startOffset = await codecStartOffset(fileExt(loop))
+        if (isCompressed(loop) && loop.startOffset === undefined) loop.startOffset = await codecStartOffset(codecKey(loop.storagePath ?? loop.url))
         await engine.select(loop)
       } catch (e) {
         fail(e)
@@ -167,8 +169,16 @@ function Studio() {
       </Section>
 
       {showUploader && (
-        <Section index="02" label="Add" sub="Upload a loop">
-          <Uploader buckets={buckets} onAdded={onAdded} />
+        <Section index="02" label="Add" sub={addMode === 'many' ? 'Import a folder or many files' : 'Upload one loop'}>
+          <div className="mb-6 flex gap-2">
+            <button type="button" onClick={() => setAddMode('many')} className={['pill', addMode === 'many' ? '' : 'pill-outline'].join(' ')}>
+              Many loops
+            </button>
+            <button type="button" onClick={() => setAddMode('one')} className={['pill', addMode === 'one' ? '' : 'pill-outline'].join(' ')}>
+              One loop
+            </button>
+          </div>
+          {addMode === 'many' ? <BulkImport buckets={buckets} onDone={reload} /> : <Uploader buckets={buckets} onAdded={onAdded} />}
         </Section>
       )}
 
