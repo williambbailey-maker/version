@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Library } from './components/Library'
 import { Login } from './components/Login'
+import { Section } from './components/Section'
 import { Mixer } from './components/Mixer'
 import { SetPassword } from './components/SetPassword'
 import { Uploader } from './components/Uploader'
+import { useBar } from './hooks/useBar'
 import { useEngine } from './hooks/useEngine'
+import { getEngine } from './engine/engine'
 import { useSession } from './hooks/useSession'
 import { codecStartOffset } from './lib/calibration'
 import { DEV_LOOPS } from './lib/devLoops'
@@ -28,6 +31,7 @@ function Studio() {
   const [error, setError] = useState<string | null>(null)
   const [showUploader, setShowUploader] = useState(false)
   const gainTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  const bar = useBar(getEngine(), engine.playing)
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
 
@@ -113,67 +117,93 @@ function Studio() {
     void engine.toggle().catch(fail)
   }
 
+  const clock = engine.drums.loop ?? engine.drums.pending
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 bg-stone-50 p-6 text-stone-900">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-2xl">Loop Lab</h1>
-        <div className="flex items-baseline gap-4">
-          <span className="font-mono text-sm text-stone-600">{engine.masterBPM} bpm</span>
-          <button type="button" onClick={() => void supabase.auth.signOut()} className="text-xs text-stone-500 underline">
-            sign out
+    <main className="min-h-screen bg-cream text-jet">
+      <header className="sticky top-0 z-10 grid h-20 grid-cols-2 items-center border-b border-line bg-cream/95 px-4 backdrop-blur md:grid-cols-12 md:px-6">
+        <span className="text-lg font-bold uppercase tracking-[-0.02em] md:col-span-3">Loop Lab</span>
+        <span className="hidden font-mono text-xs uppercase tracking-[0.2em] text-muted md:col-span-6 md:block">
+          {engine.playing ? (
+            <>
+              <span className="text-cobalt">● Playing</span> · Bar {String(bar).padStart(2, '0')}
+            </>
+          ) : (
+            '○ Stopped'
+          )}
+          {clock ? ` · ${clock.name}` : ''}
+        </span>
+        <span className="flex justify-end gap-4 md:col-span-3">
+          <button type="button" onClick={() => setShowUploader((v) => !v)} className="text-sm font-semibold transition-colors duration-300 ease-linear hover:text-cobalt">
+            {showUploader ? 'Close' : 'Add loop'}
           </button>
-        </div>
+          <button type="button" onClick={() => void supabase.auth.signOut()} className="text-sm font-semibold transition-colors duration-300 ease-linear hover:text-cobalt">
+            Sign out
+          </button>
+        </span>
       </header>
 
-      <button
-        type="button"
-        onClick={onToggle}
-        className={[
-          'min-h-16 rounded-lg px-6 text-xl text-white',
-          engine.playing ? 'bg-stone-900' : 'bg-orange-600',
-        ].join(' ')}
-      >
-        {engine.playing ? 'Stop' : 'Play'}
-      </button>
-
-      <Mixer
-        masterBPM={engine.masterBPM}
-        drums={engine.drums}
-        samples={engine.samples}
-        onGain={onGain}
-        onRemove={(loop) => engine.removeSample(loop.id)}
-      />
-
-      {showUploader ? (
-        <Uploader buckets={buckets} onAdded={onAdded} />
-      ) : (
+      <Section index="01" label="Transport" className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
+        <div>
+          <span className="label-caps block">Master tempo</span>
+          <span className="display-num mt-3 block text-[6rem] md:text-[9rem]">{engine.masterBPM}</span>
+          <span className="label-caps mt-3 block">
+            BPM{clock ? ` · ${clock.name}` : ' · choose a drum loop'}
+            {engine.playing ? ` · bar ${String(bar).padStart(2, '0')}` : ''}
+          </span>
+        </div>
         <button
           type="button"
-          onClick={() => setShowUploader(true)}
-          className="min-h-12 rounded-lg border border-dashed border-stone-400 text-stone-600"
+          onClick={onToggle}
+          className={['btn min-w-48 py-5 text-base', engine.playing ? 'bg-jet text-cream hover:bg-cobalt' : 'bg-cobalt text-cream hover:bg-jet'].join(' ')}
         >
-          + Add a loop
+          {engine.playing ? 'Stop' : 'Play'}
         </button>
-      )}
+      </Section>
 
-      {loops === null && !error ? (
-        <p className="text-sm text-stone-500">Loading library…</p>
-      ) : (
-        <Library
-          loops={library}
-          buckets={buckets}
+      <Section index="02" label="Mix">
+        <Mixer
           masterBPM={engine.masterBPM}
-          isActive={isActive}
-          loadingIds={engine.loading}
-          onSelect={onSelect}
-          onRemove={onRemove}
-          onEdit={onEdit}
-          onCreateBucket={onCreateBucket}
-          onDeleteBucket={onDeleteBucket}
+          drums={engine.drums}
+          samples={engine.samples}
+          onGain={onGain}
+          onRemove={(loop) => engine.removeSample(loop.id)}
         />
+      </Section>
+
+      {showUploader && (
+        <Section index="03" label="Add">
+          <Uploader buckets={buckets} onAdded={onAdded} />
+        </Section>
       )}
 
-      {(error ?? engine.error) && <p className="text-sm text-red-700">{error ?? engine.error}</p>}
+      <Section index={showUploader ? '04' : '03'} label="Library">
+        {loops === null && !error ? (
+          <p className="font-mono text-xs text-muted">Loading library…</p>
+        ) : (
+          <Library
+            loops={library}
+            buckets={buckets}
+            masterBPM={engine.masterBPM}
+            isActive={isActive}
+            loadingIds={engine.loading}
+            onSelect={onSelect}
+            onRemove={onRemove}
+            onEdit={onEdit}
+            onCreateBucket={onCreateBucket}
+            onDeleteBucket={onDeleteBucket}
+          />
+        )}
+      </Section>
+
+      {(error ?? engine.error) && (
+        <div className="border-t border-line px-4 py-4 md:px-6">
+          <p className="font-mono text-sm text-cobalt">{error ?? engine.error}</p>
+        </div>
+      )}
+      <footer className="border-t border-line px-4 py-6 md:px-6">
+        <span className="label-caps">Loop Lab · varispeed · bar-quantized</span>
+      </footer>
     </main>
   )
 }
