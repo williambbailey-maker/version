@@ -114,6 +114,49 @@
   }
 }
 
+/* Small key chip. */
+@utility chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1.5px solid var(--color-ink);
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+@utility chip-on {
+  border-color: var(--color-cream);
+}
+
+/* Row actions: hidden until the row is hovered or focused; always on for the active row. */
+@utility row-actions {
+  opacity: 0;
+  transition: opacity 0.15s linear;
+  .group:hover &,
+  .group:focus-within &,
+  .group:focus-visible & {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    opacity: 1;
+  }
+}
+@utility row-actions-on {
+  opacity: 1;
+  & .pill {
+    background: transparent;
+    color: var(--color-cream);
+    box-shadow: inset 0 0 0 1.5px var(--color-cream);
+  }
+  & .pill:hover {
+    background: var(--color-cream);
+    color: var(--color-ink);
+  }
+}
+
 /* Underlined mono field. */
 @utility field {
   width: 100%;

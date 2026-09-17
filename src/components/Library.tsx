@@ -4,6 +4,7 @@ import type { Loop, LoopKind } from '../engine/types'
 import type { Bucket, LoopPatch, Pack } from '../lib/loops'
 import { parseTagInput } from '../lib/loops'
 import { matches, parseQuery, tagCounts } from '../lib/search'
+import { ROW_COLS, SampleRow } from './SampleRow'
 
 /** Applied when it changes: lets the studio open "#percussion, closest tempo first". */
 export type LibraryPreset = { query: string; sort: 'name' | 'tempo'; nonce: number }
@@ -129,12 +130,53 @@ export function Library(props: Props) {
           </span>
         </button>
         {isOpen && rows.length === 0 && <p className="mono-label py-6 text-muted">Nothing here.</p>}
-        {isOpen && (
+        {isOpen && kind === 'sample' && (
+          <>
+            <div className={['mono-label hidden gap-3 py-2 text-muted md:grid', ROW_COLS].join(' ')}>
+              <span />
+              <span>Loop</span>
+              <span>Key</span>
+              <span>BPM</span>
+              <span>Stretch</span>
+              <span />
+            </div>
+            <ul className="grid gap-2 md:block md:gap-0">
+              {visible.map((loop, i) => (
+                <SampleRow
+                  key={loop.id}
+                  loop={loop}
+                  index={i + 1}
+                  packName={loop.packId ? (packById.get(loop.packId)?.name ?? null) : null}
+                  masterBPM={masterBPM}
+                  active={isActive(loop)}
+                  loading={loadingIds.includes(loop.id)}
+                  onSelect={() => onSelect(loop)}
+                  onEdit={loop.storagePath ? () => setEditing(editing === loop.id ? null : loop.id) : null}
+                  onRemove={() => onRemove(loop)}
+                  removeLabel={isActive(loop) ? 'Out' : 'Del'}
+                />
+              ))}
+            </ul>
+            {editing && visible.some((l) => l.id === editing) && (
+              <LoopEditor
+                key={editing}
+                loop={visible.find((l) => l.id === editing)!}
+                buckets={buckets}
+                packs={packs}
+                onSave={async (patch) => {
+                  await onEdit(visible.find((l) => l.id === editing)!, patch)
+                  setEditing(null)
+                }}
+                onCancel={() => setEditing(null)}
+              />
+            )}
+          </>
+        )}
+        {isOpen && kind === 'drums' && (
         <ul>
           {visible.map((loop, i) => {
             const active = isActive(loop)
             const loading = loadingIds.includes(loop.id)
-            const ratio = masterBPM / loop.bpm
             return (
               <li key={loop.id} className="border-b border-line">
                 <div className={['grid grid-cols-[2.5rem_1fr] items-start gap-x-2 md:grid-cols-[2.5rem_1fr_auto_auto]', loading ? 'opacity-60' : ''].join(' ')}>
@@ -158,12 +200,7 @@ export function Library(props: Props) {
                     </span>
                   </button>
                   <span className="mono-label col-start-2 pb-3 md:col-start-auto md:py-4 md:text-right">
-                    {kind === 'drums' ? `${loop.bpm} · ${loop.bars}b` : `${loop.bpm}${loop.key ? ` · ${loop.key}` : ''}`}
-                    {kind === 'sample' && (
-                      <span className={['ml-3 md:ml-0 md:block', Math.abs(ratio - 1) > 0.2 ? 'text-accent' : ''].join(' ')}>
-                        {ratio >= 1 ? '+' : ''}{Math.round((ratio - 1) * 100)}%
-                      </span>
-                    )}
+                    {loop.bpm} · {loop.bars}b
                   </span>
                   <span className="col-start-2 flex gap-2 pb-3 md:col-start-auto md:py-4 md:pl-4">
                     {loop.storagePath && (
@@ -177,7 +214,7 @@ export function Library(props: Props) {
                       </button>
                     )}
                     <button type="button" aria-label={`Remove ${loop.name}`} onClick={() => onRemove(loop)} className="pill pill-outline min-h-7 px-3">
-                      {active && kind === 'sample' ? 'Out' : 'Del'}
+                      Del
                     </button>
                   </span>
                 </div>
