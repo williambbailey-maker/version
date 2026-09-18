@@ -31,6 +31,7 @@ export function Room(props: Props) {
   const [room, setRoom] = useState(0)
   const [page, setPage] = useState(0)
   const [now, setNow] = useState(() => new Date())
+  const [painting, setPainting] = useState(true) // false once /room.png fails to load
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 10000)
@@ -83,6 +84,21 @@ export function Room(props: Props) {
           <path className="l" d="M540 190c-10 0-16-6-16-13 0-9 9-15 17-13 3-9 13-14 21-10 6-6 18-4 21 4 9-2 17 4 17 11 0 9-7 14-16 14z" />
         </g>
       </g>
+      {/* painting on the wall (drop your picture at public/room.png) */}
+      <clipPath id="painting">
+        <rect x="318" y="46" width="184" height="126" />
+      </clipPath>
+      {painting ? (
+        <image href="/room.png" x="318" y="46" width="184" height="126" clipPath="url(#painting)" preserveAspectRatio="xMidYMid slice" onError={() => setPainting(false)} />
+      ) : (
+        <g clipPath="url(#painting)">
+          <circle className="l" cx="370" cy="92" r="18" />
+          <path className="l" d="M318 152c30-30 50-40 80-22 24 14 44 8 72-16 12-10 22-16 32-18" />
+          <path className="l" d="M318 172c40-22 70-26 100-10 30 16 54 6 84-18" />
+        </g>
+      )}
+      <rect className="l" x="312" y="40" width="196" height="138" rx="2" style={{ strokeWidth: 3 }} />
+      <rect className="l" x="318" y="46" width="184" height="126" style={{ strokeWidth: 1 }} />
       <rect className="l" x="640" y="60" width="220" height="150" rx="3" />
       <line className="l" x1="750" y1="60" x2="750" y2="210" />
       <line className="l" x1="640" y1="135" x2="860" y2="135" />
@@ -164,18 +180,18 @@ export function Room(props: Props) {
         </g>
       </g>
 
-      {/* trombone leaning on the desk → tag */}
+      {/* trombone leaning on the desk, between the mic and the turntable → tag */}
       <g {...hotProps(`Trombone: loops tagged ${roomMap.trombone}`, () => onTag(roomMap.trombone))}>
-        <rect x="786" y="196" width="170" height="106" fill="transparent" />
-        <g transform="rotate(-26 868 262)">
+        <rect x="228" y="186" width="130" height="116" fill="transparent" />
+        <g transform="translate(-578 -14) rotate(-44 868 262) scale(0.82) translate(190 57)">
           <path className="w" d="M836 249l-42-19c-10 8-10 30 0 38l42-19z" />
           <path className="l" d="M836 250h90a7 7 0 0 1 0 14h-98a7 7 0 0 0 0 14h112" />
           <path className="l" d="M912 250v14M866 264v14M898 264v14M940 274v8" />
           <ellipse className="w" cx="944" cy="278" rx="3" ry="4.5" />
         </g>
         <g className="tip">
-          <rect x="812" y="176" width="120" height="20" rx="10" />
-          <text x="872" y="190" textAnchor="middle">{tipFor('trombone')}</text>
+          <rect x="232" y="182" width="120" height="20" rx="10" />
+          <text x="292" y="196" textAnchor="middle">{tipFor('trombone')}</text>
         </g>
       </g>
 

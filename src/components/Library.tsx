@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Loop, LoopKind } from '../engine/types'
 import type { Bucket, LoopPatch, Pack, PackPatch } from '../lib/loops'
@@ -150,7 +150,6 @@ export function Library(props: Props) {
 
   const drumsVisible = drums.slice(0, shown.drums)
   const samplesVisible = samples.slice(0, shown.sample)
-  const editingLoop = editing ? loops.find((l) => l.id === editing) : undefined
 
   return (
     <div className="flex flex-col gap-10">
@@ -348,34 +347,36 @@ export function Library(props: Props) {
             )}
             <ul className="grid gap-2 md:block md:gap-0">
               {samplesVisible.map((loop, i) => (
-                <SampleRow
-                  key={loop.id}
-                  loop={loop}
-                  index={i + 1}
-                  packName={loop.packId ? (packById.get(loop.packId)?.name ?? null) : null}
-                  masterBPM={masterBPM}
-                  active={isActive(loop)}
-                  loading={loadingIds.includes(loop.id)}
-                  onSelect={() => onSelect(loop)}
-                  onEdit={loop.storagePath ? () => setEditing(editing === loop.id ? null : loop.id) : null}
-                  onRemove={() => onRemove(loop)}
-                  removeLabel={isActive(loop) ? '×' : 'Del'}
-                />
+                <Fragment key={loop.id}>
+                  <SampleRow
+                    loop={loop}
+                    index={i + 1}
+                    packName={loop.packId ? (packById.get(loop.packId)?.name ?? null) : null}
+                    masterBPM={masterBPM}
+                    active={isActive(loop)}
+                    loading={loadingIds.includes(loop.id)}
+                    onSelect={() => onSelect(loop)}
+                    onEdit={loop.storagePath ? () => setEditing(editing === loop.id ? null : loop.id) : null}
+                    onRemove={() => onRemove(loop)}
+                    removeLabel={isActive(loop) ? '×' : 'Del'}
+                  />
+                  {editing === loop.id && (
+                    <li>
+                      <LoopEditor
+                        loop={loop}
+                        buckets={buckets}
+                        packs={packs}
+                        onSave={async (patch) => {
+                          await onEdit(loop, patch)
+                          setEditing(null)
+                        }}
+                        onCancel={() => setEditing(null)}
+                      />
+                    </li>
+                  )}
+                </Fragment>
               ))}
             </ul>
-            {editingLoop && editingLoop.kind === 'sample' && (
-              <LoopEditor
-                key={editingLoop.id}
-                loop={editingLoop}
-                buckets={buckets}
-                packs={packs}
-                onSave={async (patch) => {
-                  await onEdit(editingLoop, patch)
-                  setEditing(null)
-                }}
-                onCancel={() => setEditing(null)}
-              />
-            )}
           </>
         )}
         {more('sample', samples.length, samplesVisible.length)}
