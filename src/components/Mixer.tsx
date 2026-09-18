@@ -115,8 +115,8 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
             </div>
             <span className="mono-label truncate font-bold">{loop.name}</span>
             {removable ? (
-              <div className="flex flex-col items-start gap-1">
-                <button type="button" aria-label={`Stop ${loop.name}`} onClick={() => onRemove(loop)} className="pill pill-outline min-w-11">
+              <div className="flex flex-col items-center gap-1.5 self-stretch">
+                <button type="button" aria-label={`Stop ${loop.name}`} onClick={() => onRemove(loop)} className="pill min-h-10 min-w-14 px-4 text-[13px]">
                   ×
                 </button>
                 <button
@@ -125,7 +125,7 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
                   aria-label={`Double time ${loop.name}`}
                   title="Play at double speed (matches loops recorded at twice the drum tempo)"
                   onClick={() => onSpeed(loop, slot.speed === 2 ? 1 : 2)}
-                  className={['pill min-w-11', slot.speed === 2 ? 'pill-accent' : 'pill-outline'].join(' ')}
+                  className={['pill min-h-10 min-w-14 px-4 text-[13px]', slot.speed === 2 ? 'pill-accent' : ''].join(' ')}
                 >
                   2x
                 </button>
