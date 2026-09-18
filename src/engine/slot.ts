@@ -27,6 +27,8 @@ export class Slot {
   private gainFor: string | null = null // loop id the remembered gain belongs to
   muted = false
   solo = false
+  /** Playback multiplier on top of the tempo match: 1 = matched, 2 = double time. */
+  speed: 1 | 2 = 1
 
   constructor(ctx: BaseAudioContext, kind: LoopKind, destination: AudioNode) {
     this.ctx = ctx

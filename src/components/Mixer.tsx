@@ -18,13 +18,14 @@ type Props = {
   onRemove: (loop: Loop) => void
   onMute: (loop: Loop, muted: boolean) => void
   onSolo: (loop: Loop, solo: boolean) => void
+  onSpeed: (loop: Loop, speed: 1 | 2) => void
   boost: BoostState
   onBoost: (on: boolean) => void
   onBoostPreset: (id: string) => void
 }
 
 /** What's playing (or queued): one stripe column each. */
-export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, boost, onBoost, onBoostPreset }: Props) {
+export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, boost, onBoost, onBoostPreset }: Props) {
   const cols: { slot: SlotState; loop: Loop; removable: boolean }[] = []
   const d = drums.loop ?? drums.pending
   if (d) cols.push({ slot: drums, loop: d, removable: false })
@@ -40,7 +41,7 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
   return (
     <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
       {cols.map(({ slot, loop, removable }, i) => {
-        const ratio = masterBPM / loop.bpm
+        const ratio = (masterBPM * slot.speed) / loop.bpm
         return (
           <div key={loop.id} className="flex min-w-0 flex-col gap-2">
             <StripeFader
@@ -114,9 +115,21 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
             </div>
             <span className="mono-label truncate font-bold">{loop.name}</span>
             {removable ? (
-              <button type="button" aria-label={`Stop ${loop.name}`} onClick={() => onRemove(loop)} className="pill pill-outline self-start">
-                Out
-              </button>
+              <div className="flex flex-col items-start gap-1">
+                <button type="button" aria-label={`Stop ${loop.name}`} onClick={() => onRemove(loop)} className="pill pill-outline min-w-11">
+                  ×
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={slot.speed === 2}
+                  aria-label={`Double time ${loop.name}`}
+                  title="Play at double speed (matches loops recorded at twice the drum tempo)"
+                  onClick={() => onSpeed(loop, slot.speed === 2 ? 1 : 2)}
+                  className={['pill min-w-11', slot.speed === 2 ? 'pill-accent' : 'pill-outline'].join(' ')}
+                >
+                  2x
+                </button>
+              </div>
             ) : (
               <span className="tag self-start">Clock</span>
             )}

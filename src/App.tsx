@@ -279,6 +279,7 @@ function Studio() {
             onRemove={(loop) => engine.removeSample(loop.id)}
             onMute={(loop, m) => engine.setMuted(loop.id, m)}
             onSolo={(loop, v) => engine.setSolo(loop.id, v)}
+            onSpeed={(loop, v) => engine.setSpeed(loop.id, v)}
             boost={engine.boost}
             onBoost={engine.setBoost}
             onBoostPreset={engine.setBoostPreset}

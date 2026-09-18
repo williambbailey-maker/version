@@ -19,11 +19,12 @@ export type SlotState = {
   gain: number         // fader position 0..1
   muted: boolean
   solo: boolean
+  speed: 1 | 2         // 2 = double time (playbackRate doubled)
 }
 
 export type StackInput = {
   drums: Loop | null
-  samples: { loop: Loop; gain: number; muted: boolean; solo: boolean }[]
+  samples: { loop: Loop; gain: number; muted: boolean; solo: boolean; speed?: 1 | 2 }[]
   boost?: BoostState | null
 }
 
@@ -136,6 +137,7 @@ export class Engine {
       slot.setGain(s.gain)
       slot.muted = s.muted
       slot.solo = s.solo
+      this.setSpeed(s.loop.id, s.speed ?? 1)
     }
     this.applyMix()
     this.emit()
@@ -163,6 +165,24 @@ export class Engine {
     slot.setGain(value)
     this.applyMix()
     this.emit()
+  }
+
+  /**
+   * Double time (or back to matched): the sample's playbackRate doubles.
+   * Applied on the next bar while playing so the loop stays on the grid.
+   */
+  setSpeed(loopId: string, speed: 1 | 2): void {
+    const slot = this.samples.get(loopId)
+    if (!slot || slot.speed === speed) return
+    slot.speed = speed
+    const loop = slot.loop
+    if (this.playing && loop) slot.setRate(this.rateFor(slot, loop), this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD))
+    this.emit()
+  }
+
+  /** Tempo-match rate times the slot's speed multiplier. */
+  private rateFor(slot: Slot, loop: Loop): number {
+    return this.transport.rateFor(loop.bpm) * slot.speed
   }
 
   setMuted(loopId: string, muted: boolean): void {
@@ -228,7 +248,7 @@ export class Engine {
     if (drums) this.drums.start(drums, at, 1)
     for (const slot of this.samples.values()) {
       const loop = slot.pending
-      if (loop) slot.start(loop, at, this.transport.rateFor(loop.bpm))
+      if (loop) slot.start(loop, at, this.rateFor(slot, loop))
     }
     this.applyMix(at)
     this.emit()
@@ -281,7 +301,7 @@ export class Engine {
       this.transport.setMasterBPM(loaded.bpm, at)
       for (const slot of this.samples.values()) {
         const s = slot.loop
-        if (s) slot.setRate(this.transport.rateFor(s.bpm), at)
+        if (s) slot.setRate(this.rateFor(slot, s), at)
       }
     }
     this.emit()
@@ -294,7 +314,7 @@ export class Engine {
     this.samples.set(loop.id, slot)
     if (this.playing) {
       const at = this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD)
-      slot.start(loaded, at, this.transport.rateFor(loaded.bpm))
+      slot.start(loaded, at, this.rateFor(slot, loaded))
       this.applyMix(at)
     } else {
       slot.setPending(loaded)
@@ -339,7 +359,7 @@ export class Engine {
   }
 
   private snapshot(): EngineState {
-    const s = (slot: Slot): SlotState => ({ loop: slot.loop, pending: slot.pending, gain: slot.level, muted: slot.muted, solo: slot.solo })
+    const s = (slot: Slot): SlotState => ({ loop: slot.loop, pending: slot.pending, gain: slot.level, muted: slot.muted, solo: slot.solo, speed: slot.speed })
     return {
       playing: this.playing,
       masterBPM: this.transport.masterBPM,
