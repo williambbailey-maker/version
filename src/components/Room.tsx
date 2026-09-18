@@ -5,7 +5,6 @@ import type { RoomMap, RoomObject } from '../lib/room'
 
 type Props = {
   playing: boolean
-  bar: number
   masterBPM: number
   tagCounts: Map<string, number>
   packs: Pack[]
@@ -16,33 +15,35 @@ type Props = {
   onSessions: () => void
   onTag: (tag: string) => void
   onPack: (id: string) => void
-  onAllPacks: () => void
 }
+
+const PER_SHELF = 6
 
 /**
  * The studio: a monoline room whose objects are the navigation.
  * Room 1 is the desk (play, sessions, instruments → tags), room 2 the shelf
- * (packs). Desktop slides between rooms; phones stack them.
+ * (packs, six per page; the lamp picks one at random). Desktop slides
+ * between rooms; phones stack them.
  */
 export function Room(props: Props) {
-  const { playing, bar, masterBPM, tagCounts, packs, packStats, sessionsCount, roomMap, onPlayToggle, onSessions, onTag, onPack, onAllPacks } = props
+  const { playing, masterBPM, tagCounts, packs, packStats, sessionsCount, roomMap, onPlayToggle, onSessions, onTag, onPack } = props
   const [room, setRoom] = useState(0)
-  const [clock, setClock] = useState('')
+  const [page, setPage] = useState(0)
+  const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
-    const tick = () => {
-      const d = new Date()
-      setClock(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
-    }
-    tick()
-    const t = setInterval(tick, 15000)
+    const t = setInterval(() => setNow(new Date()), 10000)
     return () => clearInterval(t)
   }, [])
 
   const count = (tag: string) => tagCounts.get(tag) ?? 0
   const tipFor = (obj: RoomObject) => `#${roomMap[obj].toUpperCase()} · ${count(roomMap[obj])}`
-  const shelfPacks = packs.slice(0, 6)
-  const more = packs.length - shelfPacks.length
+  const pages = Math.max(1, Math.ceil(packs.length / PER_SHELF))
+  const shelfPacks = packs.slice(page * PER_SHELF, page * PER_SHELF + PER_SHELF)
+  const randomPack = () => {
+    if (packs.length === 0) return
+    onPack(packs[Math.floor(Math.random() * packs.length)]!.id)
+  }
 
   const hotProps = (label: string, act: () => void) => ({
     className: 'hot',
@@ -57,6 +58,14 @@ export function Room(props: Props) {
       }
     },
   })
+
+  // analogue clock hands
+  const minutes = now.getMinutes() + now.getSeconds() / 60
+  const hours = (now.getHours() % 12) + minutes / 60
+  const hand = (cx: number, cy: number, len: number, deg: number) => {
+    const r = ((deg - 90) * Math.PI) / 180
+    return `M${cx} ${cy}L${(cx + len * Math.cos(r)).toFixed(1)} ${(cy + len * Math.sin(r)).toFixed(1)}`
+  }
 
   const desk = (
     <svg className={['scene block h-auto w-full', playing ? 'playing' : ''].join(' ')} viewBox="0 0 1000 420" role="group" aria-label="The desk">
@@ -77,17 +86,26 @@ export function Room(props: Props) {
       <line className="l" x1="750" y1="60" x2="750" y2="210" />
       <line className="l" x1="640" y1="135" x2="860" y2="135" />
 
-      <circle className="l" cx="920" cy="110" r="26" />
-      <text x="920" y="115" textAnchor="middle" fontSize="12">{clock}</text>
+      {/* hanging plant by the window */}
+      <g className="leaf-b">
+        <path className="l" d="M590 40v26" />
+        <path className="w" d="M572 66h36l-4 18h-28z" />
+        <path className="l" d="M578 84c-4 18-2 36 8 52M590 84c0 20 2 40 10 58M602 84c6 16 8 34 4 50" />
+        <path className="l" d="M572 100c-6 6-6 12-2 18M566 122c-4 8-2 14 4 18M598 130c6 4 8 10 6 16M612 120c8 2 12 8 10 16" />
+      </g>
+
+      {/* analogue wall clock */}
+      <circle className="w" cx="920" cy="110" r="26" />
+      <path className="l" d="M920 88v4M920 128v4M898 110h4M938 110h4" />
+      <path className="l" d={hand(920, 110, 12, hours * 30)} />
+      <path className="l" d={hand(920, 110, 18, minutes * 6)} />
+      <circle className="f" cx="920" cy="110" r="2" />
       <g className="eq">
         <rect className="f" x="902" y="160" width="6" height="30" />
         <rect className="f" x="912" y="160" width="6" height="30" />
         <rect className="f" x="922" y="160" width="6" height="30" />
         <rect className="f" x="932" y="160" width="6" height="30" />
       </g>
-      <text x="920" y="208" textAnchor="middle" fontSize="10" fill="#8a7a72">
-        {playing ? `BAR ${String(bar).padStart(2, '0')}` : 'BAR --'}
-      </text>
 
       {/* headphones → sessions */}
       <g {...hotProps(`Headphones: saved sessions (${sessionsCount})`, onSessions)}>
@@ -107,11 +125,21 @@ export function Room(props: Props) {
       <rect className="w" x="150" y="300" width="800" height="16" rx="3" />
       <path className="l" d="M175 316v90M925 316v90M175 380h60M925 380h-60" />
 
-      {/* plant */}
+      {/* plant on the left */}
       <g className="leaf">
         <path className="l" d="M120 300v-60M120 250c-20-10-30-30-28-52 22 4 34 22 28 52zM120 268c18-12 40-10 50 6-16 12-40 10-50-6zM120 236c-14-16-14-40-2-58 12 14 14 38 2 58z" />
       </g>
       <path className="w" d="M96 300h48l-6 44H102z" />
+
+      {/* small succulent on the desk */}
+      <path className="w" d="M352 300h24l-3 -14h-18z" />
+      <path className="l" d="M356 286c-2-10 2-18 8-22 6 4 10 12 8 22M364 286c-8-4-12-12-10-20M364 286c8-4 12-12 10-20M360 286c-1-6 1-10 4-12" />
+
+      {/* tall snake plant on the floor, right */}
+      <g className="leaf-c">
+        <path className="l" d="M968 404c-6-40-4-80 8-118M980 404c-4-44 0-86 14-124M958 404c-2-34 2-66 12-96M990 404c2-30-2-60-12-90" />
+      </g>
+      <path className="w" d="M952 404h44l-4 14h-36z" />
 
       {/* turntable → play/stop */}
       <g {...hotProps(playing ? 'Turntable: stop' : 'Turntable: play', onPlayToggle)}>
@@ -183,20 +211,24 @@ export function Room(props: Props) {
         </g>
       </g>
 
-      {/* guitar → tag */}
-      <g {...hotProps(`Guitar: loops tagged ${roomMap.guitar}`, () => onTag(roomMap.guitar))}>
-        <rect x="276" y="288" width="86" height="122" fill="transparent" />
-        <path className="l" d="M300 322l22 78" />
-        <path className="w" d="M330 396c-10 6-26 8-34 2-8-6-8-22 4-30 2-14 16-24 30-18 14 6 18 24 12 34 0 8-4 10-12 12z" />
-        <circle className="l" cx="316" cy="382" r="5" />
-        <path className="w" d="M296 318l-8-22 12-6 10 22z" />
+      {/* FX pedal on the floor → tag */}
+      <g {...hotProps(`FX pedal: loops tagged ${roomMap.fx}`, () => onTag(roomMap.fx))}>
+        <rect x="266" y="330" width="120" height="80" fill="transparent" />
+        <path className="l" d="M246 380h30M406 380h30" />
+        <rect className="w" x="276" y="336" width="100" height="68" rx="6" />
+        <circle className="l" cx="298" cy="354" r="7" />
+        <circle className="l" cx="326" cy="354" r="7" />
+        <circle className="l" cx="354" cy="354" r="7" />
+        <path className="l" d="M298 347v7M326 347v7M354 347v7" />
+        <circle className="f" cx="326" cy="372" r="3" />
+        <rect className="w" x="306" y="380" width="40" height="14" rx="7" />
         <g className="tip">
-          <rect x="240" y="338" width="126" height="20" rx="10" />
-          <text x="303" y="352" textAnchor="middle">{tipFor('guitar')}</text>
+          <rect x="266" y="306" width="120" height="20" rx="10" />
+          <text x="326" y="320" textAnchor="middle">{tipFor('fx')}</text>
         </g>
       </g>
 
-      {/* amp → tag */}
+      {/* amp on the floor → tag */}
       <g {...hotProps(`Amp: loops tagged ${roomMap.amp}`, () => onTag(roomMap.amp))}>
         <rect className="w" x="470" y="330" width="120" height="74" rx="4" />
         <rect className="l" x="482" y="352" width="96" height="42" rx="3" />
@@ -214,34 +246,18 @@ export function Room(props: Props) {
 
   const tape = (p: Pack, x: number, y: number) => {
     const s = packStats.get(p.id)
-    const short = p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name
+    const label = p.name.length > 34 ? p.name.slice(0, 33) + '…' : p.name
     return (
       <g key={p.id} {...hotProps(`Pack: ${p.name}`, () => onPack(p.id))}>
-        <rect className="w" x={x} y={y} width="120" height="60" rx="4" />
-        <circle className="l" cx={x + 35} cy={y + 30} r="10" />
-        <circle className="l" cx={x + 85} cy={y + 30} r="10" />
-        <path className="l" d={`M${x + 45} ${y + 30}h30`} />
-        <text x={x + 60} y={y + 12} textAnchor="middle" fontSize="9">{short.toUpperCase()}</text>
+        <rect className="w" x={x} y={y} width="270" height="76" rx="5" />
+        <circle className="l" cx={x + 95} cy={y + 46} r="11" />
+        <circle className="l" cx={x + 175} cy={y + 46} r="11" />
+        <path className="l" d={`M${x + 106} ${y + 46}h58`} />
+        <text x={x + 135} y={y + 22} textAnchor="middle" fontSize="11">{label.toUpperCase()}</text>
         <g className="tip">
-          <rect x={x - 10} y={y - 28} width="140" height="20" rx="10" />
-          <text x={x + 60} y={y - 14} textAnchor="middle">
+          <rect x={x + 65} y={y - 28} width="140" height="20" rx="10" />
+          <text x={x + 135} y={y - 14} textAnchor="middle">
             {s ? `${s.count} LOOPS${s.bpmMin !== null ? ` · ${s.bpmMin}–${s.bpmMax}` : ''}` : 'PACK'}
-          </text>
-        </g>
-      </g>
-    )
-  }
-  const record = (p: Pack, x: number, y: number) => {
-    const s = packStats.get(p.id)
-    return (
-      <g key={p.id} {...hotProps(`Pack: ${p.name}`, () => onPack(p.id))}>
-        <rect className="w" x={x} y={y} width="100" height="100" rx="2" />
-        <circle className="l" cx={x + 50} cy={y + 50} r="34" />
-        <circle className="f" cx={x + 50} cy={y + 50} r="5" />
-        <g className="tip">
-          <rect x={x - 20} y={y - 28} width="140" height="20" rx="10" />
-          <text x={x + 50} y={y - 14} textAnchor="middle">
-            {(p.name.length > 12 ? p.name.slice(0, 11) + '…' : p.name).toUpperCase()}{s ? ` · ${s.count}` : ''}
           </text>
         </g>
       </g>
@@ -250,25 +266,36 @@ export function Room(props: Props) {
 
   const shelf = (
     <svg className="scene block h-auto w-full" viewBox="0 0 1000 420" role="group" aria-label="The shelf">
-      <text x="60" y="70" fontSize="11" fill="#e8453c" className="hidden md:block">
-        {packs.length ? '● EACH TAPE IS A PACK. PULL ONE DOWN.' : '● THE SHELF IS EMPTY. IMPORT A FOLDER AND IT FILLS UP.'}
-      </text>
-      <path className="l" d="M60 180h880M60 300h880M60 360h880" />
-      {shelfPacks.slice(0, 3).map((p, i) => tape(p, 90 + i * 150, 120))}
-      {shelfPacks.slice(3, 6).map((p, i) => record(p, 620 + i * 120, 200))}
-      {more > 0 && (
-        <g {...hotProps(`${more} more packs`, onAllPacks)}>
-          <rect className="w" x="560" y="120" width="120" height="60" rx="4" />
-          <text x="620" y="155" textAnchor="middle" fontSize="11">+{more} MORE</text>
+      <path className="l" d="M40 190h920M40 320h920M40 400h920" />
+      {shelfPacks.slice(0, 3).map((p, i) => tape(p, 60 + i * 300, 112))}
+      {shelfPacks.slice(3, 6).map((p, i) => tape(p, 60 + i * 300, 242))}
+      {packs.length === 0 && (
+        <text x="500" y="160" textAnchor="middle" fontSize="11" fill="#8a7a72">
+          THE SHELF IS EMPTY. IMPORT A FOLDER AND IT FILLS UP.
+        </text>
+      )}
+      {pages > 1 && (
+        <g {...hotProps(`Next shelf (${page + 1} of ${pages})`, () => setPage((page + 1) % pages))}>
+          <rect className="w" x="880" y="336" width="72" height="56" rx="4" />
+          <path className="l" d="M900 364h30M922 356l8 8-8 8" />
+          <text x="916" y="352" textAnchor="middle" fontSize="9">{page + 1}/{pages}</text>
         </g>
       )}
-      <path className="l" d="M900 120c-20 0-34 12-34 30h68c0-18-14-30-34-30zM900 150v30" />
-      <rect className="w" x="120" y="230" width="90" height="56" rx="6" />
-      <circle className="l" cx="150" cy="258" r="14" />
-      <path className="l" d="M176 246h22M176 258h22M176 270h22" />
-      <text x="500" y="392" textAnchor="middle" fontSize="11" fill="#8a7a72" className="hidden md:block">
-        THE SHELF — {packs.length} PACK{packs.length === 1 ? '' : 'S'}
-      </text>
+      {/* lamp → random pack */}
+      <g {...hotProps('Lamp: open a pack at random', randomPack)}>
+        <rect x="856" y="20" width="90" height="170" fill="transparent" />
+        <path className="w" d="M900 48c-22 0-38 14-38 34h76c0-20-16-34-38-34z" />
+        <path className="l" d="M900 82v40M880 122h40M874 190v-56M926 190v-56" />
+        <circle className="f" cx="900" cy="86" r="3" />
+        <g className="tip">
+          <rect x="820" y="6" width="160" height="20" rx="10" />
+          <text x="900" y="20" textAnchor="middle">SURPRISE ME</text>
+        </g>
+      </g>
+      {/* a small plant on the bottom shelf */}
+      <path className="w" d="M78 400h30l-3-16h-24z" />
+      <path className="l" d="M86 384c-6-14-4-28 4-38M93 384c0-16 4-30 12-40M100 384c8-10 12-22 10-34" />
+      <path className="l" d="M130 400h840" opacity="0" />
     </svg>
   )
 
@@ -289,7 +316,7 @@ export function Room(props: Props) {
       <div className="flex flex-col gap-4 md:hidden">
         <p className="caption">The desk. Tap the turntable to play, the instruments for loops.</p>
         {desk}
-        <p className="caption">The shelf. {packs.length ? 'Each tape is a pack.' : 'Import a folder and it fills up.'}</p>
+        <p className="caption">The shelf. {packs.length ? 'Each tape is a pack; the lamp picks one at random.' : 'Import a folder and it fills up.'}</p>
         {shelf}
       </div>
       <RoomNav room={room} onRoom={setRoom} />
@@ -313,11 +340,10 @@ function RoomNav({ room, onRoom }: { room: number; onRoom: (r: number) => void }
           {(
             [
               ['studio', 'Studio'],
-              ['mix', 'Mix'],
               ['sessions', 'Sessions'],
-              ['packs', 'Packs'],
+              ['mix', 'Mix'],
               ['library', 'Library'],
-              ['add', 'Add loop'],
+              ['add', 'Add loops'],
             ] as const
           ).map(([id, label]) => (
             <button key={id} type="button" onClick={() => jump(id)} className="pill pill-outline">
@@ -329,7 +355,7 @@ function RoomNav({ room, onRoom }: { room: number; onRoom: (r: number) => void }
       {info && (
         <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom,0px))] z-20 mx-auto w-[min(420px,calc(100%-32px))] rounded-2xl border-[1.5px] border-ink bg-cream p-4 text-xs leading-relaxed">
           <p className="caption mb-2">How the studio works</p>
-          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones and the crate open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. The shelf is your packs. Change which tag an instrument opens under Sessions → Studio settings.</p>
+          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones and the crate open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. The shelf is your packs; the lamp opens one at random. Change which tag an instrument opens under Sessions → Studio settings.</p>
           <button type="button" onClick={() => setInfo(false)} className="pill pill-outline mt-3">Close</button>
         </div>
       )}

@@ -106,7 +106,7 @@ export function Packs({ packs, stats, selected, onSelect, onEdit }: Props) {
   )
 }
 
-function PackEditor({ pack, onSave, onCancel }: { pack: Pack; onSave: (patch: PackPatch) => Promise<void>; onCancel: () => void }) {
+export function PackEditor({ pack, onSave, onCancel }: { pack: Pack; onSave: (patch: PackPatch) => Promise<void>; onCancel: () => void }) {
   const [name, setName] = useState(pack.name)
   const [publisher, setPublisher] = useState(pack.publisher ?? '')
   const [url, setUrl] = useState(pack.url ?? '')

@@ -4,12 +4,10 @@ import { Library } from './components/Library'
 import type { LibraryPreset } from './components/Library'
 import { Login } from './components/Login'
 import { Mixer } from './components/Mixer'
-import { Packs } from './components/Packs'
 import { Room } from './components/Room'
 import { Section } from './components/Section'
 import { Sessions } from './components/Sessions'
 import { SetPassword } from './components/SetPassword'
-import { Tagline } from './components/Tagline'
 import { Uploader } from './components/Uploader'
 import { useBar } from './hooks/useBar'
 import { useEngine } from './hooks/useEngine'
@@ -201,9 +199,9 @@ function Studio() {
 
   return (
     <main className="min-h-screen bg-cream pb-28 text-ink">
-      <header className="grid grid-cols-1 items-start gap-2 px-4 pt-5 text-center md:grid-cols-3 md:px-6 md:text-left">
-        <span className="mono-label text-muted">(a studio-shaped loop library)</span>
-        <span className="headline text-center text-3xl">LOOP LAB<span className="text-accent">.</span></span>
+      <header className="grid grid-cols-1 items-center gap-2 px-4 pt-5 text-center md:grid-cols-3 md:px-6 md:text-left">
+        <span className="hidden md:block" />
+        <span className="headline text-center text-[2.8rem] leading-none">LOOP LAB</span>
         <span className="mono-label text-muted md:text-right">
           {engine.playing ? (
             <>
@@ -218,12 +216,9 @@ function Studio() {
         </span>
       </header>
 
-      <Tagline />
-
-      <div id="studio" className="scroll-mt-4 px-4 md:px-6">
+      <div id="studio" className="scroll-mt-4 px-4 pt-8 md:px-6 md:pt-10">
         <Room
           playing={engine.playing}
-          bar={bar}
           masterBPM={engine.masterBPM}
           tagCounts={tagMap}
           packs={packs}
@@ -234,7 +229,6 @@ function Studio() {
           onSessions={openSessions}
           onTag={openTag}
           onPack={onPackFilter}
-          onAllPacks={() => jump('packs')}
         />
       </div>
 
@@ -251,6 +245,20 @@ function Studio() {
       )}
 
       <div className="mt-8">
+        <Section id="sessions" label="Sessions" sub="save what's playing, or bring a stack back">
+          <Sessions
+            sessions={sessions}
+            loops={library}
+            canSave={!!clock}
+            onSave={onSaveSession}
+            onLoad={onLoadSession}
+            onDelete={onDeleteSession}
+            roomMap={roomMap}
+            tags={allTags}
+            onRoomMap={onRoomMap}
+          />
+        </Section>
+
         <Section
           id="mix"
           label="What's playing"
@@ -277,20 +285,29 @@ function Studio() {
           />
         </Section>
 
-        <Section id="sessions" label="Sessions" sub="stacks you've saved, also on the headphones">
-          <Sessions
-            sessions={sessions}
-            loops={library}
-            canSave={!!clock}
-            onSave={onSaveSession}
-            onLoad={onLoadSession}
-            onDelete={onDeleteSession}
-            roomMap={roomMap}
-            tags={allTags}
-            onRoomMap={onRoomMap}
-          />
+        <Section id="library" label="Library" sub="tap a drum loop for the clock, tap samples to layer">
+          {loops === null && !error ? (
+            <p className="mono-label text-muted">Loading library…</p>
+          ) : (
+            <Library
+              loops={library}
+              buckets={buckets}
+              packs={packs}
+              packFilter={packFilter}
+              onPackFilter={setPackFilter}
+              onEditPack={onEditPack}
+              preset={preset}
+              masterBPM={engine.masterBPM}
+              isActive={isActive}
+              loadingIds={engine.loading}
+              onSelect={onSelect}
+              onRemove={onRemove}
+              onEdit={onEdit}
+              onCreateBucket={onCreateBucket}
+              onDeleteBucket={onDeleteBucket}
+            />
+          )}
         </Section>
-
         <Section
           id="add"
           label="Add loops"
@@ -318,32 +335,6 @@ function Studio() {
           )}
         </Section>
 
-        <Section id="packs" label="Packs" sub="where the loops came from">
-          <Packs packs={packs} stats={stats} selected={packFilter} onSelect={onPackFilter} onEdit={onEditPack} />
-        </Section>
-
-        <Section id="library" label="Library" sub="tap a drum loop for the clock, tap samples to layer">
-          {loops === null && !error ? (
-            <p className="mono-label text-muted">Loading library…</p>
-          ) : (
-            <Library
-              loops={library}
-              buckets={buckets}
-              packs={packs}
-              packFilter={packFilter}
-              onPackFilter={setPackFilter}
-              preset={preset}
-              masterBPM={engine.masterBPM}
-              isActive={isActive}
-              loadingIds={engine.loading}
-              onSelect={onSelect}
-              onRemove={onRemove}
-              onEdit={onEdit}
-              onCreateBucket={onCreateBucket}
-              onDeleteBucket={onDeleteBucket}
-            />
-          )}
-        </Section>
       </div>
 
       <footer className="border-t border-line px-4 py-6 md:px-6">
