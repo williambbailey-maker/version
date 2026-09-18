@@ -128,6 +128,7 @@ export class Engine {
     if (!slot) return
     this.samples.delete(loopId)
     slot.dispose(this.playing ? this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD) : this.ctx.currentTime)
+    this.settleClock()
     this.applyMix() // a removed solo releases the others
     this.emit()
   }
@@ -176,16 +177,17 @@ export class Engine {
     if (this.drumsLoading) await this.drumsLoading.catch(() => {})
     if (this.playing) return
     const drums = this.drums.pending
-    if (!drums) throw new Error('Choose a drum loop before pressing play')
+    const clockBPM = drums?.bpm ?? this.sampleClockBPM()
+    if (clockBPM === null) throw new Error('Pick a drum loop or a sample before pressing play')
 
     // If a quantized stop is still in flight, pick up exactly where it lands.
     const now = this.ctx.currentTime
     const at = this.stopAt !== null && this.stopAt > now ? this.stopAt : now + START_LEAD
     this.stopAt = null
 
-    this.transport.setMasterBPM(drums.bpm)
+    this.transport.setMasterBPM(clockBPM)
     this.transport.start(at)
-    this.drums.start(drums, at, 1)
+    if (drums) this.drums.start(drums, at, 1)
     for (const slot of this.samples.values()) {
       const loop = slot.pending
       if (loop) slot.start(loop, at, this.transport.rateFor(loop.bpm))
@@ -258,9 +260,29 @@ export class Engine {
       this.applyMix(at)
     } else {
       slot.setPending(loaded)
+      this.settleClock()
       this.applyMix()
     }
     this.emit()
+  }
+
+  /**
+   * No drums chosen: the first sample is the clock, so it plays at its own
+   * tempo and any others follow it. Drums take over the moment they are picked.
+   */
+  private sampleClockBPM(): number | null {
+    for (const slot of this.samples.values()) {
+      const l = slot.loop ?? slot.pending
+      if (l) return l.bpm
+    }
+    return null
+  }
+
+  /** While stopped without drums, keep masterBPM on the sample that will lead. */
+  private settleClock(): void {
+    if (this.playing || this.drums.pending) return
+    const bpm = this.sampleClockBPM()
+    if (bpm !== null) this.transport.setMasterBPM(bpm)
   }
 
   private async load(loop: Loop): Promise<LoadedLoop> {
