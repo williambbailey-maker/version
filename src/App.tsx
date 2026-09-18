@@ -161,9 +161,9 @@ function Studio() {
     void (async () => {
       try {
         setError(null)
-        const { drums, samples, missing } = resolveStack(s, library)
+        const { drums, samples, boost, missing } = resolveStack(s, library)
         await Promise.all([...(drums ? [prepare(drums)] : []), ...samples.map((x) => prepare(x.loop))])
-        await engine.loadStack({ drums, samples })
+        await engine.loadStack({ drums, samples, boost })
         setNotice(missing ? `Loaded "${s.name}" · ${missing} loop${missing === 1 ? '' : 's'} missing from the library.` : `Loaded "${s.name}".`)
         jump('mix')
       } catch (e) {
@@ -279,6 +279,9 @@ function Studio() {
             onRemove={(loop) => engine.removeSample(loop.id)}
             onMute={(loop, m) => engine.setMuted(loop.id, m)}
             onSolo={(loop, v) => engine.setSolo(loop.id, v)}
+            boost={engine.boost}
+            onBoost={engine.setBoost}
+            onBoostPreset={engine.setBoostPreset}
           />
         </Section>
 

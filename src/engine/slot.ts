@@ -14,7 +14,10 @@ const GAIN_TAU = 0.005
  */
 export class Slot {
   readonly kind: LoopKind
+  /** Where source nodes connect; feeds the gain node directly or via an insert. */
+  readonly input: GainNode
   readonly gain: GainNode
+  private insert: { input: AudioNode; output: AudioNode } | null = null
 
   private ctx: BaseAudioContext
   private node: AudioBufferSourceNode | null = null
@@ -31,6 +34,23 @@ export class Slot {
     this.gain = ctx.createGain()
     this.gain.gain.value = 1
     this.gain.connect(destination)
+    this.input = ctx.createGain()
+    this.input.gain.value = 1
+    this.input.connect(this.gain)
+  }
+
+  /** Patch an effect between the sources and the fader (null removes it). */
+  setInsert(fx: { input: AudioNode; output: AudioNode } | null): void {
+    if (this.insert === fx) return
+    this.input.disconnect()
+    if (this.insert) this.insert.output.disconnect()
+    this.insert = fx
+    if (fx) {
+      this.input.connect(fx.input)
+      fx.output.connect(this.gain)
+    } else {
+      this.input.connect(this.gain)
+    }
   }
 
   /** The loop currently sounding (or scheduled to start). */
@@ -89,7 +109,7 @@ export class Slot {
     // exactly to the bar). Never exceed the buffer though.
     node.loopEnd = Math.min(offset + loopLengthSec(loop), loop.buffer.duration)
     node.playbackRate.value = rate
-    node.connect(this.gain)
+    node.connect(this.input)
     node.start(at, offset)
 
     this.node = node
@@ -123,10 +143,14 @@ export class Slot {
     this._pending = null
     this._loop = null
     if (!node) {
+      this.input.disconnect()
       this.gain.disconnect()
       return
     }
-    this.stopNode(at, () => this.gain.disconnect())
+    this.stopNode(at, () => {
+      this.input.disconnect()
+      this.gain.disconnect()
+    })
   }
 
   /** Fader position only; call the engine's applyMix() to make it audible. */

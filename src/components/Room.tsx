@@ -31,7 +31,6 @@ export function Room(props: Props) {
   const [room, setRoom] = useState(0)
   const [page, setPage] = useState(0)
   const [now, setNow] = useState(() => new Date())
-  const [painting, setPainting] = useState(true) // false once /room.png fails to load
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 10000)
@@ -84,21 +83,6 @@ export function Room(props: Props) {
           <path className="l" d="M540 190c-10 0-16-6-16-13 0-9 9-15 17-13 3-9 13-14 21-10 6-6 18-4 21 4 9-2 17 4 17 11 0 9-7 14-16 14z" />
         </g>
       </g>
-      {/* painting on the wall (drop your picture at public/room.png) */}
-      <clipPath id="painting">
-        <rect x="318" y="46" width="184" height="126" />
-      </clipPath>
-      {painting ? (
-        <image href="/room.png" x="318" y="46" width="184" height="126" clipPath="url(#painting)" preserveAspectRatio="xMidYMid slice" onError={() => setPainting(false)} />
-      ) : (
-        <g clipPath="url(#painting)">
-          <circle className="l" cx="370" cy="92" r="18" />
-          <path className="l" d="M318 152c30-30 50-40 80-22 24 14 44 8 72-16 12-10 22-16 32-18" />
-          <path className="l" d="M318 172c40-22 70-26 100-10 30 16 54 6 84-18" />
-        </g>
-      )}
-      <rect className="l" x="312" y="40" width="196" height="138" rx="2" style={{ strokeWidth: 3 }} />
-      <rect className="l" x="318" y="46" width="184" height="126" style={{ strokeWidth: 1 }} />
       <rect className="l" x="640" y="60" width="220" height="150" rx="3" />
       <line className="l" x1="750" y1="60" x2="750" y2="210" />
       <line className="l" x1="640" y1="135" x2="860" y2="135" />
@@ -110,12 +94,6 @@ export function Room(props: Props) {
       <path className="l" d={hand(920, 110, 12, hours * 30)} />
       <path className="l" d={hand(920, 110, 18, minutes * 6)} />
       <circle className="f" cx="920" cy="110" r="2" />
-      <g className="eq">
-        <rect className="f" x="902" y="160" width="6" height="30" />
-        <rect className="f" x="912" y="160" width="6" height="30" />
-        <rect className="f" x="922" y="160" width="6" height="30" />
-        <rect className="f" x="932" y="160" width="6" height="30" />
-      </g>
 
       {/* headphones → sessions */}
       <g {...hotProps(`Headphones: saved sessions (${sessionsCount})`, onSessions)}>
@@ -140,11 +118,6 @@ export function Room(props: Props) {
         <path className="l" d="M120 300v-60M120 250c-20-10-30-30-28-52 22 4 34 22 28 52zM120 268c18-12 40-10 50 6-16 12-40 10-50-6zM120 236c-14-16-14-40-2-58 12 14 14 38 2 58z" />
       </g>
       <path className="w" d="M96 300h48l-6 44H102z" />
-
-      {/* small succulent on the desk */}
-      <path className="w" d="M352 300h24l-3 -14h-18z" />
-      <path className="l" d="M356 286c-2-10 2-18 8-22 6 4 10 12 8 22M364 286c-8-4-12-12-10-20M364 286c8-4 12-12 10-20M360 286c-1-6 1-10 4-12" />
-
 
       {/* turntable → play/stop */}
       <g {...hotProps(playing ? 'Turntable: stop' : 'Turntable: play', onPlayToggle)}>
