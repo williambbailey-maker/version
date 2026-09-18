@@ -215,6 +215,7 @@ function Studio() {
           roomMap={DEFAULT_ROOM}
           onPlayToggle={onToggle}
           onSessions={openSessions}
+          onAdd={() => { setShowUploader(true); setTimeout(() => jump('add'), 30) }}
           onTag={openTag}
           onPack={onPackFilter}
         />
