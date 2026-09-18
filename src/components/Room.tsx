@@ -246,17 +246,17 @@ export function Room(props: Props) {
 
   const tape = (p: Pack, x: number, y: number) => {
     const s = packStats.get(p.id)
-    const label = p.name.length > 34 ? p.name.slice(0, 33) + '…' : p.name
+    const label = p.name.length > 30 ? p.name.slice(0, 29) + '…' : p.name
     return (
       <g key={p.id} {...hotProps(`Pack: ${p.name}`, () => onPack(p.id))}>
-        <rect className="w" x={x} y={y} width="270" height="76" rx="5" />
-        <circle className="l" cx={x + 95} cy={y + 46} r="11" />
-        <circle className="l" cx={x + 175} cy={y + 46} r="11" />
-        <path className="l" d={`M${x + 106} ${y + 46}h58`} />
-        <text x={x + 135} y={y + 22} textAnchor="middle" fontSize="11">{label.toUpperCase()}</text>
+        <rect className="w" x={x} y={y} width="250" height="76" rx="5" />
+        <circle className="l" cx={x + 85} cy={y + 46} r="11" />
+        <circle className="l" cx={x + 165} cy={y + 46} r="11" />
+        <path className="l" d={`M${x + 96} ${y + 46}h58`} />
+        <text x={x + 125} y={y + 22} textAnchor="middle" fontSize="10.5">{label.toUpperCase()}</text>
         <g className="tip">
-          <rect x={x + 65} y={y - 28} width="140" height="20" rx="10" />
-          <text x={x + 135} y={y - 14} textAnchor="middle">
+          <rect x={x + 55} y={y - 28} width="140" height="20" rx="10" />
+          <text x={x + 125} y={y - 14} textAnchor="middle">
             {s ? `${s.count} LOOPS${s.bpmMin !== null ? ` · ${s.bpmMin}–${s.bpmMax}` : ''}` : 'PACK'}
           </text>
         </g>
@@ -267,8 +267,8 @@ export function Room(props: Props) {
   const shelf = (
     <svg className="scene block h-auto w-full" viewBox="0 0 1000 420" role="group" aria-label="The shelf">
       <path className="l" d="M40 190h920M40 320h920M40 400h920" />
-      {shelfPacks.slice(0, 3).map((p, i) => tape(p, 60 + i * 300, 112))}
-      {shelfPacks.slice(3, 6).map((p, i) => tape(p, 60 + i * 300, 242))}
+      {shelfPacks.slice(0, 3).map((p, i) => tape(p, 60 + i * 270, 112))}
+      {shelfPacks.slice(3, 6).map((p, i) => tape(p, 60 + i * 270, 242))}
       {packs.length === 0 && (
         <text x="500" y="160" textAnchor="middle" fontSize="11" fill="#8a7a72">
           THE SHELF IS EMPTY. IMPORT A FOLDER AND IT FILLS UP.
@@ -283,13 +283,14 @@ export function Room(props: Props) {
       )}
       {/* lamp → random pack */}
       <g {...hotProps('Lamp: open a pack at random', randomPack)}>
-        <rect x="856" y="20" width="90" height="170" fill="transparent" />
-        <path className="w" d="M900 48c-22 0-38 14-38 34h76c0-20-16-34-38-34z" />
-        <path className="l" d="M900 82v40M880 122h40M874 190v-56M926 190v-56" />
-        <circle className="f" cx="900" cy="86" r="3" />
+        <rect x="866" y="70" width="90" height="120" fill="transparent" />
+        <path className="w" d="M912 98c-22 0-38 14-38 34h76c0-20-16-34-38-34z" />
+        <path className="l" d="M912 132v46M892 178h40" />
+        <path className="l" d="M912 178v12" />
+        <circle className="f" cx="912" cy="136" r="3" />
         <g className="tip">
-          <rect x="820" y="6" width="160" height="20" rx="10" />
-          <text x="900" y="20" textAnchor="middle">SURPRISE ME</text>
+          <rect x="832" y="64" width="160" height="20" rx="10" />
+          <text x="912" y="78" textAnchor="middle">SURPRISE ME</text>
         </g>
       </g>
       {/* a small plant on the bottom shelf */}
