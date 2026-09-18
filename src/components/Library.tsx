@@ -359,7 +359,7 @@ export function Library(props: Props) {
                   onSelect={() => onSelect(loop)}
                   onEdit={loop.storagePath ? () => setEditing(editing === loop.id ? null : loop.id) : null}
                   onRemove={() => onRemove(loop)}
-                  removeLabel={isActive(loop) ? 'Out' : 'Del'}
+                  removeLabel={isActive(loop) ? '×' : 'Del'}
                 />
               ))}
             </ul>
