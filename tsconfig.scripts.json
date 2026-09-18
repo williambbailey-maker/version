@@ -22,6 +22,7 @@
     "scripts/**/*.ts",
     "api/**/*.ts",
     "src/lib/tempo.ts",
+    "src/lib/naming.ts",
     "src/lib/packs.ts",
     "src/lib/pageinfo.ts",
     "src/engine/types.ts"

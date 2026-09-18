@@ -305,15 +305,23 @@ export function Library(props: Props) {
                 Closest tempo first
               </button>
               {keys.length > 0 && (
-                <>
-                  <span className="mono-label ml-2 text-muted">Key</span>
-                  <button type="button" onClick={() => setKey(null)} className={pill(key === null, 'min-h-7 px-3')}>Any</button>
-                  {keys.map(([k, n]) => (
-                    <button key={k} type="button" onClick={() => setKey(key === k ? null : k)} className={pill(key === k, 'min-h-7 px-3')}>
-                      {k} <span className="ml-1 opacity-60">{n}</span>
-                    </button>
-                  ))}
-                </>
+                <label className="mono-label ml-2 flex items-center gap-2 text-muted">
+                  Key
+                  <select
+                    id="key-filter"
+                    value={key ?? ''}
+                    onChange={(e) => setKey(e.target.value || null)}
+                    className={['pill min-h-8 cursor-pointer appearance-none pr-7', key ? '' : 'pill-outline'].join(' ')}
+                    style={{ backgroundImage: 'none' }}
+                  >
+                    <option value="">Any key</option>
+                    {keys.map(([k, n]) => (
+                      <option key={k} value={k}>
+                        {k} ({n})
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
             </div>
 

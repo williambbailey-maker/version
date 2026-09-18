@@ -4,6 +4,7 @@ import { WEB_MP3, encodeClick, encodeMp3 } from './encode'
 import { ensurePack, existingSourcePaths, uploadBlob, uploadCalibration } from './loops'
 import type { PackPatch } from './loops'
 import { packFromPath } from './packs'
+import { readableSampleName } from './naming'
 import { estimateLoop, guessBars, keyFromFilename } from './tempo'
 import type { TempoSource } from './tempo'
 
@@ -140,7 +141,8 @@ export async function runBulkImport(
 
       item.status = 'uploading'
       update(item)
-      const name = item.file.name.replace(/\.[^.]+$/, '')
+      const base = item.file.name.replace(/\.[^.]+$/, '')
+      const name = item.kind === 'sample' ? readableSampleName(base) : base
       await uploadBlob(blob, ext, contentType, {
         name,
         bpm: item.bpm,

@@ -4,6 +4,7 @@ import { getContext } from '../engine/context'
 import type { Bars, Loop, LoopKind } from '../engine/types'
 import { parseTagInput, uploadLoop } from '../lib/loops'
 import type { Bucket } from '../lib/loops'
+import { readableSampleName } from '../lib/naming'
 import { estimateLoop, guessBars, keyFromFilename } from '../lib/tempo'
 import type { TempoSource } from '../lib/tempo'
 
@@ -50,11 +51,13 @@ export function Uploader({ buckets, onAdded }: Props) {
     setError(null)
     setBarsTouched(false)
     if (!f) return
-    const base = f.name.replace(/\.[^.]+$/, '')
+    const raw = f.name.replace(/\.[^.]+$/, '')
+    // Drums/sample heuristic from the name; cheap and easily overridden.
+    const isDrums = /drum|beat|kick|perc|break/i.test(f.name)
+    setKind(isDrums ? 'drums' : 'sample')
+    const base = isDrums ? raw : readableSampleName(raw)
     if (!name || name === autoName) setName(base)
     setAutoName(base)
-    // Drums/sample heuristic from the name; cheap and easily overridden.
-    setKind(/drum|beat|kick|perc|break/i.test(f.name) ? 'drums' : 'sample')
     setDetecting(true)
     try {
       const est = await estimateLoop(f, (bytes) => getContext().decodeAudioData(bytes))
