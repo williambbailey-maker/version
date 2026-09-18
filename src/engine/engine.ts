@@ -1,3 +1,4 @@
+import { Booster, DEFAULT_PRESET_ID, boostPreset } from './booster'
 import { ensureRunning, getContext } from './context'
 import { Loader } from './loader'
 import { Slot } from './slot'
@@ -10,6 +11,8 @@ const START_LEAD = 0.05
 /** A bar boundary closer than this is skipped when scheduling a swap. */
 const SWAP_MIN_LEAD = 0.02
 
+export type BoostState = { on: boolean; preset: string }
+
 export type SlotState = {
   loop: Loop | null    // sounding (or scheduled)
   pending: Loop | null // chosen while stopped
@@ -18,11 +21,18 @@ export type SlotState = {
   solo: boolean
 }
 
+export type StackInput = {
+  drums: Loop | null
+  samples: { loop: Loop; gain: number; muted: boolean; solo: boolean }[]
+  boost?: BoostState | null
+}
+
 export type EngineState = {
   playing: boolean
   masterBPM: number
   barSec: number
   drums: SlotState
+  boost: BoostState // drum booster (compressor chain)
   samples: SlotState[] // one per active sample loop, in the order they were added
   loading: readonly string[] // loop ids currently being fetched/decoded
   error: string | null
@@ -42,6 +52,8 @@ export class Engine {
   readonly master: GainNode
 
   private drums: Slot
+  private booster: Booster | null = null // built on first use
+  private boost: BoostState = { on: false, preset: DEFAULT_PRESET_ID }
   private samples = new Map<string, Slot>() // keyed by loop id
   private listeners = new Set<Listener>()
   private loading = new Set<string>()
@@ -106,8 +118,15 @@ export class Engine {
    * Replace the whole stack: drums, the set of samples, and their levels.
    * Bar-quantized while playing (everything changes on the same boundary).
    */
-  async loadStack(stack: { drums: Loop | null; samples: { loop: Loop; gain: number; muted: boolean; solo: boolean }[] }): Promise<void> {
+  async loadStack(stack: StackInput): Promise<void> {
     if (stack.drums) await this.selectDrums(stack.drums)
+    if (stack.boost !== undefined) {
+      const b = stack.boost ?? { on: false, preset: DEFAULT_PRESET_ID }
+      if (b.on || this.booster) {
+        this.setBoostPreset(b.preset)
+        this.setBoost(b.on)
+      }
+    }
     const keep = new Set(stack.samples.map((s) => s.loop.id))
     for (const id of [...this.samples.keys()]) if (!keep.has(id)) this.removeSample(id)
     for (const s of stack.samples) {
@@ -160,6 +179,25 @@ export class Engine {
     if (!slot) return
     slot.solo = solo
     this.applyMix()
+    this.emit()
+  }
+
+  /** Drum booster on/off. The chain is built the first time it's switched on. */
+  setBoost(on: boolean): void {
+    if (on && !this.booster) {
+      this.booster = new Booster(this.ctx)
+      this.booster.apply(boostPreset(this.boost.preset).params)
+      this.drums.setInsert(this.booster)
+    }
+    this.boost = { ...this.boost, on }
+    this.booster?.setOn(on)
+    this.emit()
+  }
+
+  setBoostPreset(id: string): void {
+    const preset = boostPreset(id)
+    this.boost = { ...this.boost, preset: preset.id }
+    this.booster?.apply(preset.params)
     this.emit()
   }
 
@@ -307,6 +345,7 @@ export class Engine {
       masterBPM: this.transport.masterBPM,
       barSec: this.transport.barSec,
       drums: s(this.drums),
+      boost: this.boost,
       samples: [...this.samples.values()].map(s),
       loading: [...this.loading],
       error: this.error,

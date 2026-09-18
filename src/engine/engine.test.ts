@@ -18,6 +18,11 @@ function fakeContext(calls: Call[], gains: GainNodeFake[] = []) {
       gains.push(g)
       return g
     },
+    createDynamicsCompressor: () => ({ threshold: param(-24), ratio: param(12), knee: param(30), attack: param(0.003), release: param(0.25), connect() {}, disconnect() {} }),
+    createWaveShaper: () => ({ curve: null, oversample: 'none', connect() {}, disconnect() {} }),
+    createBiquadFilter: () => ({ type: 'lowpass', frequency: param(350), connect() {}, disconnect() {} }),
+    createDelay: () => ({ delayTime: param(0), connect() {}, disconnect() {} }),
+    createOscillator: () => ({ type: 'sine', frequency: param(440), start() {}, stop() {}, connect() {}, disconnect() {} }),
     createBufferSource() {
       const node = {
         buffer: null as { id: string } | null,
@@ -54,8 +59,9 @@ function make() {
   const gains: GainNodeFake[] = []
   const ctx = fakeContext(calls, gains)
   const engine = new Engine(ctx)
-  // gains[0] is the master; slot gain nodes follow in creation order (drums first).
-  const targets = () => gains.slice(1).map((g) => g.gain.target)
+  // gains[0] is the master; each slot then creates its fader gain followed by
+  // its input gain, so the faders are every other node from index 1.
+  const targets = () => gains.slice(1).filter((_, i) => i % 2 === 0).map((g) => g.gain.target)
   return { engine, calls, gains, targets, ctx: ctx as unknown as { currentTime: number } }
 }
 
@@ -101,6 +107,18 @@ describe('Engine', () => {
     expect(start.at).toBeCloseTo(t0 + 240 / 88, 10)
     expect(engine.state.masterBPM).toBe(100)
     expect(engine.state.samples[0]!.loop?.id).toBe('a')
+  })
+
+  it('drum booster: off by default, on builds the chain, presets and sessions round-trip', async () => {
+    const { engine } = make()
+    expect(engine.state.boost).toEqual({ on: false, preset: 'default' })
+    engine.setBoostPreset('slam')
+    engine.setBoost(true)
+    expect(engine.state.boost).toEqual({ on: true, preset: 'slam' })
+    await engine.loadStack({ drums: loop('d', 'drums', 100), samples: [], boost: { on: false, preset: 'glue' } })
+    expect(engine.state.boost).toEqual({ on: false, preset: 'glue' })
+    engine.setBoostPreset('not-a-preset')
+    expect(engine.state.boost.preset).toBe('default')
   })
 
   it('refuses to play with nothing chosen', async () => {
