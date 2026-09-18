@@ -121,6 +121,25 @@ describe('Engine', () => {
     expect(engine.state.boost.preset).toBe('default')
   })
 
+  it('2x doubles a sample\'s rate on the next bar and sticks across stop/play', async () => {
+    const { engine, calls, ctx } = make()
+    await engine.select(loop('d', 'drums', 70))
+    await engine.select(loop('a', 'sample', 140))
+    await engine.play()
+    const t0 = engine.transport.transportStart!
+    expect(calls.find((c) => c.kind === 'start' && c.loop === 'a')!.rate).toBeCloseTo(0.5, 10)
+    ctx.currentTime = t0 + 1
+    const node = engine.state.samples[0]!
+    expect(node.speed).toBe(1)
+    engine.setSpeed('a', 2)
+    expect(engine.state.samples[0]!.speed).toBe(2)
+    engine.stop()
+    ctx.currentTime = t0 + 20
+    await engine.play()
+    const starts = calls.filter((c) => c.kind === 'start' && c.loop === 'a')
+    expect(starts[starts.length - 1]!.rate).toBeCloseTo(1, 10)
+  })
+
   it('refuses to play with nothing chosen', async () => {
     const { engine } = make()
     await expect(engine.play()).rejects.toThrow(/drum loop or a sample/)

@@ -2,7 +2,7 @@ import type { Loop } from '../engine/types'
 import type { BoostState, EngineState } from '../engine/engine'
 import { supabase } from './supabase'
 
-export type SessionSample = { loopId: string; gain: number; muted: boolean; solo: boolean }
+export type SessionSample = { loopId: string; gain: number; muted: boolean; solo: boolean; speed: 1 | 2 }
 
 export type Session = {
   id: string
@@ -34,6 +34,7 @@ function fromRow(r: Row): Session {
         gain: typeof s.gain === 'number' ? s.gain : 0.8,
         muted: s.muted === true,
         solo: s.solo === true,
+        speed: s.speed === 2 ? 2 : 1,
       })),
     boost: boostFrom(r.boost),
     updatedAt: r.updated_at,
@@ -46,7 +47,7 @@ export function snapshotStack(state: EngineState): { drumsLoopId: string | null;
   const samples: SessionSample[] = []
   for (const s of state.samples) {
     const l = s.loop ?? s.pending
-    if (l) samples.push({ loopId: l.id, gain: s.gain, muted: s.muted, solo: s.solo })
+    if (l) samples.push({ loopId: l.id, gain: s.gain, muted: s.muted, solo: s.solo, speed: s.speed })
   }
   return { drumsLoopId: d?.id ?? null, samples, boost: state.boost }
 }
@@ -54,7 +55,7 @@ export function snapshotStack(state: EngineState): { drumsLoopId: string | null;
 /** Resolve a session against the loaded library; reports what's missing. */
 export function resolveStack(session: Session, loops: readonly Loop[]): {
   drums: Loop | null
-  samples: { loop: Loop; gain: number; muted: boolean; solo: boolean }[]
+  samples: { loop: Loop; gain: number; muted: boolean; solo: boolean; speed: 1 | 2 }[]
   boost: BoostState | null
   missing: number
 } {
@@ -62,14 +63,14 @@ export function resolveStack(session: Session, loops: readonly Loop[]): {
   let missing = 0
   const drums = session.drumsLoopId ? (byId.get(session.drumsLoopId) ?? null) : null
   if (session.drumsLoopId && !drums) missing++
-  const samples: { loop: Loop; gain: number; muted: boolean; solo: boolean }[] = []
+  const samples: { loop: Loop; gain: number; muted: boolean; solo: boolean; speed: 1 | 2 }[] = []
   for (const s of session.samples) {
     const loop = byId.get(s.loopId)
     if (!loop) {
       missing++
       continue
     }
-    samples.push({ loop, gain: s.gain, muted: s.muted, solo: s.solo })
+    samples.push({ loop, gain: s.gain, muted: s.muted, solo: s.solo, speed: s.speed })
   }
   return { drums, samples, boost: session.boost, missing }
 }
@@ -84,7 +85,7 @@ export async function saveSession(name: string, stack: { drumsLoopId: string | n
   const row = {
     name: name.trim(),
     drums_loop_id: stack.drumsLoopId,
-    samples: stack.samples.map((s) => ({ loop_id: s.loopId, gain: s.gain, muted: s.muted, solo: s.solo })),
+    samples: stack.samples.map((s) => ({ loop_id: s.loopId, gain: s.gain, muted: s.muted, solo: s.solo, speed: s.speed })),
     boost: stack.boost ?? null,
     updated_at: new Date().toISOString(),
   }
