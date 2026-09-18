@@ -17,7 +17,7 @@ export function Sessions({ sessions, loops, canSave, onSave, onLoad, onDelete }:
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const nameOf = (id: string | null) => (id ? (loops.find((l) => l.id === id)?.name ?? 'missing loop') : 'no clock')
+  const nameOf = (id: string | null) => (id ? (loops.find((l) => l.id === id)?.name ?? 'missing loop') : 'no drums')
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -44,7 +44,7 @@ export function Sessions({ sessions, loops, canSave, onSave, onLoad, onDelete }:
         <button type="submit" disabled={!canSave || busy || !name.trim()} className="pill">
           {busy ? 'Saving…' : 'Save session'}
         </button>
-        {!canSave && <span className="mono-label text-muted">Pick a drum loop first.</span>}
+        {!canSave && <span className="mono-label text-muted">Pick a loop first.</span>}
         {error && <span className="mono-label text-accent">{error}</span>}
       </form>
 

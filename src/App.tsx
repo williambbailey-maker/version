@@ -151,6 +151,7 @@ function Studio() {
 
   // ---- sessions
   const clock = engine.drums.loop ?? engine.drums.pending
+  const hasStack = !!clock || engine.samples.some((s) => s.loop ?? s.pending)
   const onSaveSession = async (name: string) => {
     const s = await saveSession(name, snapshotStack(engine))
     setSessions((ss) => [s, ...(ss ?? [])])
@@ -231,7 +232,7 @@ function Studio() {
           <Sessions
             sessions={sessions}
             loops={library}
-            canSave={!!clock}
+            canSave={hasStack}
             onSave={onSaveSession}
             onLoad={onLoadSession}
             onDelete={onDeleteSession}
@@ -247,7 +248,7 @@ function Studio() {
               <button type="button" onClick={onToggle} className={['pill', engine.playing ? 'pill-accent' : ''].join(' ')}>
                 {engine.playing ? 'Stop' : 'Play'}
               </button>
-              <button type="button" onClick={openSessions} disabled={!clock} className="pill pill-outline">
+              <button type="button" onClick={openSessions} disabled={!hasStack} className="pill pill-outline">
                 Save stack
               </button>
             </div>

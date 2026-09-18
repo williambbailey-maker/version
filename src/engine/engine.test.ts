@@ -76,6 +76,38 @@ describe('Engine', () => {
     expect(engine.state.masterBPM).toBe(100)
   })
 
+  it('plays samples alone when no drum loop is chosen: the first sample is the clock', async () => {
+    const { engine, calls } = make()
+    await engine.select(loop('a', 'sample', 88))
+    expect(engine.state.masterBPM).toBe(88)
+    await engine.select(loop('b', 'sample', 120, 1))
+    expect(engine.state.masterBPM).toBe(88)
+    await engine.play()
+    const starts = calls.filter((c) => c.kind === 'start')
+    expect(starts.map((c) => c.loop)).toEqual(['a', 'b'])
+    expect(starts[0]!.rate).toBe(1)
+    expect(starts[1]!.rate).toBeCloseTo(88 / 120, 10)
+    expect(engine.state.drums.loop).toBeNull()
+  })
+
+  it('hands the clock to drums picked while samples already play', async () => {
+    const { engine, calls, ctx } = make()
+    await engine.select(loop('a', 'sample', 88))
+    await engine.play()
+    const t0 = engine.transport.transportStart!
+    ctx.currentTime = t0 + 1
+    await engine.select(loop('d', 'drums', 100))
+    const start = calls.find((c) => c.kind === 'start' && c.loop === 'd')!
+    expect(start.at).toBeCloseTo(t0 + 240 / 88, 10)
+    expect(engine.state.masterBPM).toBe(100)
+    expect(engine.state.samples[0]!.loop?.id).toBe('a')
+  })
+
+  it('refuses to play with nothing chosen', async () => {
+    const { engine } = make()
+    await expect(engine.play()).rejects.toThrow(/drum loop or a sample/)
+  })
+
   it('toggles a sample in and out on bar boundaries while playing', async () => {
     const { engine, calls, ctx } = make()
     await engine.select(loop('d', 'drums', 100))
