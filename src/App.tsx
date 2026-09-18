@@ -182,9 +182,14 @@ function Studio() {
     setPreset({ query: `#${tag}`, sort: 'tempo', nonce: Date.now() })
     jump('library')
   }
+  const [showSessions, setShowSessions] = useState(false)
   const openSessions = () => {
-    jump('sessions')
-    setTimeout(() => document.getElementById('session-name')?.focus({ preventScroll: true }), 500)
+    setShowSessions(true)
+    // the section mounts on the next render; scroll once it exists
+    setTimeout(() => {
+      jump('sessions')
+      setTimeout(() => document.getElementById('session-name')?.focus({ preventScroll: true }), 500)
+    }, 30)
   }
 
   return (
@@ -228,16 +233,27 @@ function Studio() {
       )}
 
       <div className="mt-8">
-        <Section id="sessions" label="Sessions" sub="save what's playing, or bring a stack back">
-          <Sessions
-            sessions={sessions}
-            loops={library}
-            canSave={hasStack}
-            onSave={onSaveSession}
-            onLoad={onLoadSession}
-            onDelete={onDeleteSession}
-          />
-        </Section>
+        {showSessions && (
+          <Section
+            id="sessions"
+            label="Sessions"
+            sub="save what's playing, or bring a stack back"
+            aside={
+              <button type="button" onClick={() => setShowSessions(false)} className="pill pill-outline">
+                Hide
+              </button>
+            }
+          >
+            <Sessions
+              sessions={sessions}
+              loops={library}
+              canSave={hasStack}
+              onSave={onSaveSession}
+              onLoad={onLoadSession}
+              onDelete={onDeleteSession}
+            />
+          </Section>
+        )}
 
         <Section
           id="mix"

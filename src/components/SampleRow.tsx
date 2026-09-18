@@ -33,7 +33,7 @@ export function SampleRow({ loop, index, packName, masterBPM, active, loading, o
           Edit
         </button>
       )}
-      <button type="button" aria-label={`Remove ${loop.name}`} onClick={onRemove} className="pill min-h-6 px-2.5 text-[10px]">
+      <button type="button" aria-label={`Remove ${loop.name}`} onClick={onRemove} className="pill min-h-6 min-w-11 px-2.5 text-[10px]">
         {removeLabel}
       </button>
     </span>

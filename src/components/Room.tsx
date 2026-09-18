@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Pack } from '../lib/loops'
 import type { PackStats } from '../lib/packs'
 import type { RoomMap, RoomObject } from '../lib/room'
@@ -163,6 +163,21 @@ export function Room(props: Props) {
         </g>
       </g>
 
+      {/* trombone leaning on the desk → tag */}
+      <g {...hotProps(`Trombone: loops tagged ${roomMap.trombone}`, () => onTag(roomMap.trombone))}>
+        <rect x="786" y="196" width="170" height="106" fill="transparent" />
+        <g transform="rotate(-26 868 262)">
+          <path className="w" d="M836 249l-42-19c-10 8-10 30 0 38l42-19z" />
+          <path className="l" d="M836 250h90a7 7 0 0 1 0 14h-98a7 7 0 0 0 0 14h112" />
+          <path className="l" d="M912 250v14M866 264v14M898 264v14M940 274v8" />
+          <ellipse className="w" cx="944" cy="278" rx="3" ry="4.5" />
+        </g>
+        <g className="tip">
+          <rect x="812" y="176" width="120" height="20" rx="10" />
+          <text x="872" y="190" textAnchor="middle">{tipFor('trombone')}</text>
+        </g>
+      </g>
+
       {/* mic → tag */}
       <g {...hotProps(`Mic: loops tagged ${roomMap.mic}`, () => onTag(roomMap.mic))}>
         <rect x="176" y="222" width="58" height="84" fill="transparent" />
@@ -274,31 +289,73 @@ export function Room(props: Props) {
     </svg>
   )
 
+  // Desktop: the two rooms sit in a horizontal scroll-snap track, so a
+  // two-finger swipe on a trackpad or Magic Mouse slides between them
+  // natively; the dots and the nav arrows scroll the same track.
+  const track = useRef<HTMLDivElement>(null)
+  const goRoom = (r: number) => {
+    const el = track.current
+    setRoom(r)
+    if (el) el.scrollTo({ left: r * el.clientWidth, behavior: 'smooth' })
+  }
+  const onTrackScroll = () => {
+    const el = track.current
+    if (!el || el.clientWidth === 0) return
+    const r = Math.round(el.scrollLeft / el.clientWidth)
+    if (r !== room) setRoom(r)
+  }
+  // Wheel fallback: a sideways flick on a mouse that sends small deltas
+  // adds up to one room change per gesture, even where the browser snaps
+  // each tick straight back.
+  useEffect(() => {
+    const el = track.current
+    if (!el) return
+    let acc = 0
+    let locked = false
+    let quiet: ReturnType<typeof setTimeout> | undefined
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return
+      clearTimeout(quiet)
+      quiet = setTimeout(() => { acc = 0; locked = false }, 350)
+      if (locked) return
+      acc += e.deltaX
+      if (Math.abs(acc) < 80) return
+      locked = true
+      const current = Math.round(el.scrollLeft / Math.max(1, el.clientWidth))
+      const next = Math.max(0, Math.min(1, current + (acc > 0 ? 1 : -1)))
+      acc = 0
+      if (next !== current) goRoom(next)
+    }
+    el.addEventListener('wheel', onWheel, { passive: true })
+    return () => { el.removeEventListener('wheel', onWheel); clearTimeout(quiet) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div className="relative">
-      {/* desktop: slide between rooms */}
-      <div className="hidden overflow-hidden md:block">
-        <div className="flex transition-transform duration-500 ease-in-out motion-reduce:transition-none" style={{ transform: `translateX(-${room * 100}%)` }}>
-          <div className="w-full shrink-0">{desk}</div>
-          <div className="w-full shrink-0">{shelf}</div>
+      {/* desktop: swipe between rooms */}
+      <div className="hidden md:block">
+        <div ref={track} onScroll={onTrackScroll} className="room-track flex" aria-roledescription="carousel">
+          <div className="w-full shrink-0 snap-start">{desk}</div>
+          <div className="w-full shrink-0 snap-start">{shelf}</div>
         </div>
         <div className="mt-2 flex justify-center gap-2">
-          <button type="button" onClick={() => setRoom(0)} aria-label="The desk" className={['h-2 w-2 rounded-full', room === 0 ? 'bg-ink' : 'bg-line'].join(' ')} />
-          <button type="button" onClick={() => setRoom(1)} aria-label="The shelf" className={['h-2 w-2 rounded-full', room === 1 ? 'bg-ink' : 'bg-line'].join(' ')} />
+          <button type="button" onClick={() => goRoom(0)} aria-label="The desk" className={['h-2 w-2 rounded-full', room === 0 ? 'bg-ink' : 'bg-line'].join(' ')} />
+          <button type="button" onClick={() => goRoom(1)} aria-label="The shelf" className={['h-2 w-2 rounded-full', room === 1 ? 'bg-ink' : 'bg-line'].join(' ')} />
         </div>
       </div>
-      {/* phone: stacked, with HTML captions since SVG text is too small there */}
+      {/* phone: stacked */}
       <div className="flex flex-col gap-6 md:hidden">
         {desk}
         {shelf}
       </div>
-      <RoomNav room={room} onRoom={setRoom} />
+      <RoomNav room={room} onRoom={goRoom} onSessions={onSessions} />
     </div>
   )
 }
 
 /** The small dark pill at the bottom: info, menu, previous, next. */
-function RoomNav({ room, onRoom }: { room: number; onRoom: (r: number) => void }) {
+function RoomNav({ room, onRoom, onSessions }: { room: number; onRoom: (r: number) => void; onSessions: () => void }) {
   const [menu, setMenu] = useState(false)
   const [info, setInfo] = useState(false)
   const jump = (id: string) => {
@@ -319,7 +376,7 @@ function RoomNav({ room, onRoom }: { room: number; onRoom: (r: number) => void }
               ['add', 'Add loops'],
             ] as const
           ).map(([id, label]) => (
-            <button key={id} type="button" onClick={() => jump(id)} className="pill pill-outline">
+            <button key={id} type="button" onClick={() => { if (id === 'sessions') { setMenu(false); onSessions() } else jump(id) }} className="pill pill-outline">
               {label}
             </button>
           ))}
@@ -328,7 +385,7 @@ function RoomNav({ room, onRoom }: { room: number; onRoom: (r: number) => void }
       {info && (
         <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom,0px))] z-20 mx-auto w-[min(420px,calc(100%-32px))] rounded-2xl border-[1.5px] border-ink bg-cream p-4 text-xs leading-relaxed">
           <p className="caption mb-2">How the studio works</p>
-          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. The shelf is your packs; the lamp opens one at random.</p>
+          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. Swipe sideways to reach the shelf. The shelf is your packs; the lamp opens one at random.</p>
           <button type="button" onClick={() => setInfo(false)} className="pill pill-outline mt-3">Close</button>
         </div>
       )}

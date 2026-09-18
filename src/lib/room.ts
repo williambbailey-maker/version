@@ -1,11 +1,11 @@
 import { supabase } from './supabase'
 
 /** Studio objects that open a tag. The user can point each at any tag. */
-export type RoomObject = 'congas' | 'keyboard' | 'fx' | 'amp' | 'mic'
+export type RoomObject = 'congas' | 'keyboard' | 'fx' | 'amp' | 'mic' | 'trombone'
 
 export type RoomMap = Record<RoomObject, string>
 
-export const DEFAULT_ROOM: RoomMap = { congas: 'percussion', keyboard: 'keys', fx: 'fx', amp: 'bass', mic: 'vocals' }
+export const DEFAULT_ROOM: RoomMap = { congas: 'percussion', keyboard: 'keys', fx: 'fx', amp: 'bass', mic: 'vocals', trombone: 'horns' }
 
 export const ROOM_OBJECT_LABEL: Record<RoomObject, string> = {
   congas: 'Congas',
@@ -13,6 +13,7 @@ export const ROOM_OBJECT_LABEL: Record<RoomObject, string> = {
   fx: 'FX pedal',
   amp: 'Amp',
   mic: 'Mic',
+  trombone: 'Trombone',
 }
 
 export async function loadRoomMap(): Promise<RoomMap> {

@@ -200,6 +200,19 @@
   }
 }
 
+/* Studio rooms: a horizontal snap track with no visible scrollbar. */
+.room-track {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.room-track::-webkit-scrollbar {
+  display: none;
+}
+
 /* Studio room drawing */
 .scene * {
   stroke-linecap: round;
