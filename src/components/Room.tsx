@@ -13,6 +13,7 @@ type Props = {
   roomMap: RoomMap
   onPlayToggle: () => void
   onSessions: () => void
+  onAdd: () => void
   onTag: (tag: string) => void
   onPack: (id: string) => void
 }
@@ -26,7 +27,7 @@ const PER_SHELF = 6
  * between rooms; phones stack them.
  */
 export function Room(props: Props) {
-  const { playing, masterBPM, tagCounts, packs, packStats, sessionsCount, roomMap, onPlayToggle, onSessions, onTag, onPack } = props
+  const { playing, masterBPM, tagCounts, packs, packStats, sessionsCount, roomMap, onPlayToggle, onSessions, onAdd, onTag, onPack } = props
   const [room, setRoom] = useState(0)
   const [page, setPage] = useState(0)
   const [now, setNow] = useState(() => new Date())
@@ -221,6 +222,19 @@ export function Room(props: Props) {
         </g>
       </g>
 
+      {/* basket under the desk → add loops */}
+      <g {...hotProps('Basket: add loops', onAdd)}>
+        <rect x="636" y="326" width="128" height="84" fill="transparent" />
+        <path className="w" d="M646 350h108l-10 54h-88z" />
+        <ellipse className="w" cx="700" cy="350" rx="54" ry="8" />
+        <path className="l" d="M652 366h96M656 382h88M660 396h80M672 350l-6 54M686 350l-3 54M714 350l3 54M728 350l6 54" />
+        <path className="l" d="M670 344c6-16 54-16 60 0" />
+        <g className="tip">
+          <rect x="645" y="304" width="110" height="20" rx="10" />
+          <text x="700" y="318" textAnchor="middle">ADD LOOPS</text>
+        </g>
+      </g>
+
       {/* amp on the floor → tag */}
       <g {...hotProps(`Amp: loops tagged ${roomMap.amp}`, () => onTag(roomMap.amp))}>
         <rect className="w" x="470" y="330" width="120" height="74" rx="4" />
@@ -349,7 +363,10 @@ export function Room(props: Props) {
         {desk}
         {shelf}
       </div>
-      <RoomNav room={room} onRoom={goRoom} onSessions={onSessions} />
+      {/* phone only: the small nav pill. Desktop swipes between rooms instead. */}
+      <div className="md:hidden">
+        <RoomNav room={room} onRoom={goRoom} onSessions={onSessions} />
+      </div>
     </div>
   )
 }
@@ -385,7 +402,7 @@ function RoomNav({ room, onRoom, onSessions }: { room: number; onRoom: (r: numbe
       {info && (
         <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom,0px))] z-20 mx-auto w-[min(420px,calc(100%-32px))] rounded-2xl border-[1.5px] border-ink bg-cream p-4 text-xs leading-relaxed">
           <p className="caption mb-2">How the studio works</p>
-          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. Swipe sideways to reach the shelf. The shelf is your packs; the lamp opens one at random.</p>
+          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. Swipe sideways to reach the shelf. The shelf is your packs; the lamp opens one at random. The basket under the desk adds loops.</p>
           <button type="button" onClick={() => setInfo(false)} className="pill pill-outline mt-3">Close</button>
         </div>
       )}
