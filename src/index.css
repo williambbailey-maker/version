@@ -281,16 +281,6 @@
   transform-origin: 120px 300px;
   animation: sway 6s ease-in-out infinite;
 }
-.leaf-b {
-  transform-origin: 590px 66px;
-  animation: sway 8s ease-in-out infinite;
-  animation-delay: -3s;
-}
-.leaf-c {
-  transform-origin: 974px 404px;
-  animation: sway 7s ease-in-out infinite;
-  animation-delay: -1.5s;
-}
 @keyframes sway {
   0%, 100% { transform: rotate(-2deg); }
   50% { transform: rotate(2deg); }
@@ -337,7 +327,7 @@
   50% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cloud, .leaf, .leaf-b, .leaf-c, .playing .platter, .playing .eq rect, .cursor-blink {
+  .cloud, .leaf, .playing .platter, .playing .eq rect, .cursor-blink {
     animation: none !important;
   }
 }

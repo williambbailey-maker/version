@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Loop } from '../engine/types'
-import type { RoomMap, RoomObject } from '../lib/room'
-import { DEFAULT_ROOM, ROOM_OBJECT_LABEL } from '../lib/room'
 import type { Session } from '../lib/sessions'
 
 type Props = {
@@ -12,17 +10,13 @@ type Props = {
   onSave: (name: string) => Promise<void>
   onLoad: (s: Session) => void
   onDelete: (s: Session) => void
-  roomMap: RoomMap
-  tags: string[]
-  onRoomMap: (map: RoomMap) => Promise<void>
 }
 
-/** Saved stacks, plus the settings for which tag each studio object opens. */
-export function Sessions({ sessions, loops, canSave, onSave, onLoad, onDelete, roomMap, tags, onRoomMap }: Props) {
+/** Saved stacks. */
+export function Sessions({ sessions, loops, canSave, onSave, onLoad, onDelete }: Props) {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
   const nameOf = (id: string | null) => (id ? (loops.find((l) => l.id === id)?.name ?? 'missing loop') : 'no clock')
 
   const submit = async (e: FormEvent) => {
@@ -79,32 +73,6 @@ export function Sessions({ sessions, loops, canSave, onSave, onLoad, onDelete, r
         </ul>
       )}
 
-      <div>
-        <button type="button" onClick={() => setShowSettings((v) => !v)} className="pill pill-outline">
-          {showSettings ? 'Hide studio settings' : 'Studio settings'}
-        </button>
-        {showSettings && (
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <p className="mono-label text-muted md:col-span-3">Which tag each object in the studio opens.</p>
-            {(Object.keys(DEFAULT_ROOM) as RoomObject[]).map((obj) => (
-              <label key={obj} className="mono-label flex flex-col gap-1 text-muted">
-                {ROOM_OBJECT_LABEL[obj]}
-                <input
-                  list="room-tags"
-                  value={roomMap[obj]}
-                  onChange={(e) => void onRoomMap({ ...roomMap, [obj]: e.target.value.trim().toLowerCase() || DEFAULT_ROOM[obj] })}
-                  className="field text-ink"
-                />
-              </label>
-            ))}
-            <datalist id="room-tags">
-              {tags.map((t) => (
-                <option key={t} value={t} />
-              ))}
-            </datalist>
-          </div>
-        )}
-      </div>
     </div>
   )
 }

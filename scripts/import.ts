@@ -37,6 +37,7 @@ import { tmpdir, homedir } from 'node:os'
 import { basename, extname, join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { combineEstimates, estimateBPM, bpmFromFilename, keyFromFilename } from '../src/lib/tempo'
+import { readableSampleName } from '../src/lib/naming'
 import { packFromPath } from '../src/lib/packs'
 import { extractPageInfo } from '../src/lib/pageinfo'
 import type { Bars, LoopKind } from '../src/engine/types'
@@ -290,13 +291,13 @@ async function main(): Promise<void> {
         summary.skipped++
         continue
       }
-      const name = basename(file, extname(file))
+      const rawName = basename(file, extname(file))
       const { pack, category } = args.pack
         ? { pack: args.pack, category: sourcePath.includes('/') ? sourcePath.split('/').slice(0, -1).join('/') : null }
         : packFromPath(sourcePath, rootName)
 
       const duration = await probeDuration(file)
-      const filenameBPM = bpmFromFilename(name)
+      const filenameBPM = bpmFromFilename(rawName)
       let audioBPM: number | null = null
       if (filenameBPM === null) {
         const mono = await decodeMono(file)
@@ -310,7 +311,8 @@ async function main(): Promise<void> {
       }
       const kind: LoopKind =
         args.kind !== 'auto' ? args.kind : /drum|beat|break|perc|kick|top/i.test(sourcePath) ? 'drums' : 'sample'
-      const key = keyFromFilename(name)
+      const key = keyFromFilename(rawName)
+      const name = kind === 'sample' ? readableSampleName(rawName) : rawName
 
       const line = `${sourcePath}  →  ${est.bpm} bpm · ${est.bars} bars · ${kind}${key ? ' · ' + key : ''}  [${pack ?? '-'}${category ? ' / ' + category : ''}]  (${est.source})`
       if (args.dryRun) {

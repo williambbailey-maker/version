@@ -86,13 +86,6 @@ export function Room(props: Props) {
       <line className="l" x1="750" y1="60" x2="750" y2="210" />
       <line className="l" x1="640" y1="135" x2="860" y2="135" />
 
-      {/* hanging plant by the window */}
-      <g className="leaf-b">
-        <path className="l" d="M590 40v26" />
-        <path className="w" d="M572 66h36l-4 18h-28z" />
-        <path className="l" d="M578 84c-4 18-2 36 8 52M590 84c0 20 2 40 10 58M602 84c6 16 8 34 4 50" />
-        <path className="l" d="M572 100c-6 6-6 12-2 18M566 122c-4 8-2 14 4 18M598 130c6 4 8 10 6 16M612 120c8 2 12 8 10 16" />
-      </g>
 
       {/* analogue wall clock */}
       <circle className="w" cx="920" cy="110" r="26" />
@@ -135,11 +128,6 @@ export function Room(props: Props) {
       <path className="w" d="M352 300h24l-3 -14h-18z" />
       <path className="l" d="M356 286c-2-10 2-18 8-22 6 4 10 12 8 22M364 286c-8-4-12-12-10-20M364 286c8-4 12-12 10-20M360 286c-1-6 1-10 4-12" />
 
-      {/* tall snake plant on the floor, right */}
-      <g className="leaf-c">
-        <path className="l" d="M968 404c-6-40-4-80 8-118M980 404c-4-44 0-86 14-124M958 404c-2-34 2-66 12-96M990 404c2-30-2-60-12-90" />
-      </g>
-      <path className="w" d="M952 404h44l-4 14h-36z" />
 
       {/* turntable → play/stop */}
       <g {...hotProps(playing ? 'Turntable: stop' : 'Turntable: play', onPlayToggle)}>
@@ -161,16 +149,6 @@ export function Room(props: Props) {
         <g className="tip">
           <rect x="410" y="190" width="120" height="20" rx="10" />
           <text x="470" y="204" textAnchor="middle">{playing ? 'STOP' : `PLAY · ${masterBPM} BPM`}</text>
-        </g>
-      </g>
-
-      {/* record crate → sessions */}
-      <g {...hotProps(`Record crate: saved sessions (${sessionsCount})`, onSessions)}>
-        <rect className="w" x="240" y="236" width="110" height="64" rx="3" />
-        <path className="l" d="M256 300v-52l14-10v62M282 300v-50l14-10v60M310 300v-48l14-10v58" />
-        <g className="tip">
-          <rect x="236" y="206" width="118" height="20" rx="10" />
-          <text x="295" y="220" textAnchor="middle">SESSIONS · {sessionsCount}</text>
         </g>
       </g>
 
@@ -293,10 +271,6 @@ export function Room(props: Props) {
           <text x="912" y="78" textAnchor="middle">SURPRISE ME</text>
         </g>
       </g>
-      {/* a small plant on the bottom shelf */}
-      <path className="w" d="M78 400h30l-3-16h-24z" />
-      <path className="l" d="M86 384c-6-14-4-28 4-38M93 384c0-16 4-30 12-40M100 384c8-10 12-22 10-34" />
-      <path className="l" d="M130 400h840" opacity="0" />
     </svg>
   )
 
@@ -314,10 +288,8 @@ export function Room(props: Props) {
         </div>
       </div>
       {/* phone: stacked, with HTML captions since SVG text is too small there */}
-      <div className="flex flex-col gap-4 md:hidden">
-        <p className="caption">The desk. Tap the turntable to play, the instruments for loops.</p>
+      <div className="flex flex-col gap-6 md:hidden">
         {desk}
-        <p className="caption">The shelf. {packs.length ? 'Each tape is a pack; the lamp picks one at random.' : 'Import a folder and it fills up.'}</p>
         {shelf}
       </div>
       <RoomNav room={room} onRoom={setRoom} />
@@ -356,7 +328,7 @@ function RoomNav({ room, onRoom }: { room: number; onRoom: (r: number) => void }
       {info && (
         <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom,0px))] z-20 mx-auto w-[min(420px,calc(100%-32px))] rounded-2xl border-[1.5px] border-ink bg-cream p-4 text-xs leading-relaxed">
           <p className="caption mb-2">How the studio works</p>
-          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones and the crate open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. The shelf is your packs; the lamp opens one at random. Change which tag an instrument opens under Sessions → Studio settings.</p>
+          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. The shelf is your packs; the lamp opens one at random.</p>
           <button type="button" onClick={() => setInfo(false)} className="pill pill-outline mt-3">Close</button>
         </div>
       )}

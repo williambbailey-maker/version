@@ -9,17 +9,14 @@ import { Section } from './components/Section'
 import { Sessions } from './components/Sessions'
 import { SetPassword } from './components/SetPassword'
 import { Uploader } from './components/Uploader'
-import { useBar } from './hooks/useBar'
 import { useEngine } from './hooks/useEngine'
-import { getEngine } from './engine/engine'
 import { useSession } from './hooks/useSession'
 import { codecKey, codecStartOffset } from './lib/calibration'
 import { DEV_LOOPS } from './lib/devLoops'
 import { createBucket, deleteBucket, deleteLoop, ensureUrl, isCompressed, listBuckets, listLoops, listPacks, updateLoop, updatePack } from './lib/loops'
 import type { Bucket, LoopPatch, Pack, PackPatch } from './lib/loops'
 import { packStats } from './lib/packs'
-import { DEFAULT_ROOM, loadRoomMap, saveRoomMap } from './lib/room'
-import type { RoomMap } from './lib/room'
+import { DEFAULT_ROOM } from './lib/room'
 import { tagCounts } from './lib/search'
 import { deleteSession, listSessions, resolveStack, saveSession, snapshotStack } from './lib/sessions'
 import type { Session } from './lib/sessions'
@@ -40,7 +37,6 @@ function Studio() {
   const [buckets, setBuckets] = useState<Bucket[]>([])
   const [packs, setPacks] = useState<Pack[]>([])
   const [sessions, setSessions] = useState<Session[] | null>(null)
-  const [roomMap, setRoomMap] = useState<RoomMap>(DEFAULT_ROOM)
   const [packFilter, setPackFilter] = useState<string | null>(null)
   const [preset, setPreset] = useState<LibraryPreset | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -48,18 +44,16 @@ function Studio() {
   const [showUploader, setShowUploader] = useState(false)
   const [addMode, setAddMode] = useState<'one' | 'many'>('many')
   const gainTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
-  const bar = useBar(getEngine(), engine.playing)
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
   const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   const reload = useCallback(() => {
-    Promise.all([listLoops(), listBuckets(), listPacks(), listSessions(), loadRoomMap()]).then(([ls, bs, ps, ss, rm]) => {
+    Promise.all([listLoops(), listBuckets(), listPacks(), listSessions()]).then(([ls, bs, ps, ss]) => {
       setLoops(ls)
       setBuckets(bs)
       setPacks(ps)
       setSessions(ss)
-      setRoomMap(rm)
     }, fail)
   }, [])
 
@@ -69,7 +63,6 @@ function Studio() {
   const library = loops && loops.length > 0 ? loops : [...DEV_LOOPS]
   const stats = useMemo(() => packStats(library), [library])
   const tagMap = useMemo(() => new Map(tagCounts(library)), [library])
-  const allTags = useMemo(() => [...tagMap.keys()], [tagMap])
 
   const isActive = (loop: Loop) => engine.isActive(loop.id)
 
@@ -181,10 +174,6 @@ function Studio() {
     if (!window.confirm(`Delete session "${s.name}"?`)) return
     deleteSession(s.id).then(() => setSessions((ss) => (ss ? ss.filter((x) => x.id !== s.id) : ss)), fail)
   }
-  const onRoomMap = async (map: RoomMap) => {
-    setRoomMap(map)
-    await saveRoomMap(map)
-  }
 
   // ---- studio actions
   const openTag = (tag: string) => {
@@ -203,14 +192,7 @@ function Studio() {
         <span className="hidden md:block" />
         <span className="headline text-center text-[2.8rem] leading-none">LOOP LAB</span>
         <span className="mono-label text-muted md:text-right">
-          {engine.playing ? (
-            <>
-              <span className="text-accent">●</span> playing · {engine.masterBPM} bpm · bar {String(bar).padStart(2, '0')}
-            </>
-          ) : (
-            `○ stopped · ${engine.masterBPM} bpm`
-          )}
-          <button type="button" onClick={() => void supabase.auth.signOut()} className="ml-4 underline underline-offset-4 hover:text-accent">
+          <button type="button" onClick={() => void supabase.auth.signOut()} className="underline underline-offset-4 hover:text-accent">
             sign out
           </button>
         </span>
@@ -224,7 +206,7 @@ function Studio() {
           packs={packs}
           packStats={stats}
           sessionsCount={sessions?.length ?? 0}
-          roomMap={roomMap}
+          roomMap={DEFAULT_ROOM}
           onPlayToggle={onToggle}
           onSessions={openSessions}
           onTag={openTag}
@@ -253,9 +235,6 @@ function Studio() {
             onSave={onSaveSession}
             onLoad={onLoadSession}
             onDelete={onDeleteSession}
-            roomMap={roomMap}
-            tags={allTags}
-            onRoomMap={onRoomMap}
           />
         </Section>
 
