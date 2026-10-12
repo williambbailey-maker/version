@@ -46,3 +46,17 @@ describe('auto kind and tags', () => {
     expect(autoTags('Pack/Keys/x.wav', [])).toEqual([])
   })
 })
+
+describe('makeDroppedItems with several folders', () => {
+  it('one drop with two folders yields two packs, and ids continue from idFrom', () => {
+    const items = makeDroppedItems(
+      [
+        { file: f('a.wav'), path: 'Pack A/a.wav' },
+        { file: f('b.wav'), path: 'Pack B/b.wav' },
+      ],
+      10,
+    )
+    expect(items.map((i) => i.pack)).toEqual(['Pack A', 'Pack B'])
+    expect(items.map((i) => i.id)).toEqual([10, 11])
+  })
+})

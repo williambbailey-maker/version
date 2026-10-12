@@ -39,8 +39,10 @@ export function BulkImport({ buckets, onDone, dropped }: Props) {
   const [running, setRunning] = useState(false)
   const [over, setOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [queued, setQueued] = useState(0) // files dropped while an import was running
   const stop = useRef(false)
   const runningRef = useRef(false)
+  const queue = useRef<DroppedFile[]>([])
 
   const pick = (files: FileList | null) => {
     if (!files) return
@@ -81,6 +83,14 @@ export function BulkImport({ buckets, onDone, dropped }: Props) {
       runningRef.current = false
       setRunning(false)
       onDone()
+      // Folders dropped during the run go next, appended under the finished rows.
+      if (queue.current.length > 0) {
+        const more = queue.current
+        queue.current = []
+        setQueued(0)
+        const next = makeDroppedItems(more, work.length === 0 ? 0 : Math.max(...work.map((it) => it.id)) + 1)
+        if (next.length > 0) void run([...work, ...next], optionsFor('folders', null))
+      }
     }
   }
 
@@ -95,6 +105,11 @@ export function BulkImport({ buckets, onDone, dropped }: Props) {
 
   /** A dropped folder imports straight away: its name is the pack. */
   const importDrop = (files: DroppedFile[]) => {
+    if (runningRef.current) {
+      queue.current.push(...files)
+      setQueued(queue.current.length)
+      return
+    }
     const next = makeDroppedItems(files)
     if (next.length === 0) {
       setError('No audio files in that drop (wav, aif, flac, mp3, m4a).')
@@ -143,7 +158,8 @@ export function BulkImport({ buckets, onDone, dropped }: Props) {
         className={['flex flex-col items-center gap-3 border-[1.5px] border-dashed p-6 text-center transition-colors duration-200', over ? 'border-accent bg-accent/5' : 'border-line'].join(' ')}
       >
         <p className="headline text-2xl">Drop folders here</p>
-        <p className="mono-label max-w-md text-muted">Each folder becomes a pack and starts importing straight away. Sub-folders become categories. Or pick from your computer:</p>
+        <p className="mono-label max-w-md text-muted">Drop one folder or several at once: each becomes its own pack and starts importing straight away. Sub-folders become categories. Or pick from your computer:</p>
+        {queued > 0 && <p className="tag">{queued} more file{queued === 1 ? '' : 's'} queued for after this import</p>}
         <div className="flex flex-wrap justify-center gap-2">
           <label className="pill pill-outline cursor-pointer">
             <input type="file" multiple accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.m4a" onChange={(e) => pick(e.target.files)} className="sr-only" disabled={running} />

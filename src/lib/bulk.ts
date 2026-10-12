@@ -91,9 +91,9 @@ export function makeItems(files: FileList | File[]): BulkItem[] {
  * deeper folders the category. Paths keep the top folder so re-dropping
  * the same pack is recognised as already imported.
  */
-export function makeDroppedItems(dropped: { file: File; path: string }[]): BulkItem[] {
+export function makeDroppedItems(dropped: { file: File; path: string }[], idFrom = 0): BulkItem[] {
   const out: BulkItem[] = []
-  let id = 0
+  let id = idFrom
   for (const { file, path } of dropped) {
     if (!/\.(wav|aif|aiff|flac|mp3|m4a)$/i.test(file.name)) continue
     const { pack, category } = packFromPath(path, null)
