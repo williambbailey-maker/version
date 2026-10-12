@@ -24,6 +24,12 @@ export type Loop = {
 export type LoadedLoop = Loop & { buffer: AudioBuffer }
 
 export const DEFAULT_GAIN = 0.8
+/** Samples start quiet so the drums lead; drums start at the classic 0.8. */
+export const DEFAULT_SAMPLE_GAIN = 0.15
+
+export function defaultGain(kind: LoopKind): number {
+  return kind === 'sample' ? DEFAULT_SAMPLE_GAIN : DEFAULT_GAIN
+}
 
 export function isPowerOfTwoBars(bars: number): bars is Bars {
   return bars === 1 || bars === 2 || bars === 4 || bars === 8
