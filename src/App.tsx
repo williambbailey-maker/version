@@ -340,11 +340,13 @@ function Studio() {
                 </button>
               </div>
               {addMode === 'many' ? <BulkImport buckets={buckets} onDone={reload} dropped={dropped} /> : <Uploader buckets={buckets} onAdded={onAdded} />}
-              <TidyStorage />
             </>
           ) : (
             <p className="mono-label text-muted">Drop a folder on the basket and it lands on the shelf as a pack. Or open this and pick files from your computer.</p>
           )}
+          <div className="mt-6 border-t border-line pt-4">
+            <TidyStorage />
+          </div>
         </Section>
 
       </div>
