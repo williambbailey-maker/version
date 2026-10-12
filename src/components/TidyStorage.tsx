@@ -21,16 +21,16 @@ export function TidyStorage() {
         return
       }
       const bytes = orphans.reduce((n, f) => n + f.size, 0)
-      if (!window.confirm(`Remove ${orphans.length} file${orphans.length === 1 ? '' : 's'} (${mb(bytes)}) that no loop uses any more?`)) {
+      if (!window.confirm(`Delete ${orphans.length} file${orphans.length === 1 ? '' : 's'} (${mb(bytes)}) that no loop uses any more?`)) {
         setState('idle')
         return
       }
       setState('removing')
       const n = await removeFiles(
         orphans.map((f) => f.path),
-        (done) => setNote(`Removing… ${done} / ${orphans.length}`),
+        (done) => setNote(`Deleting… ${done} / ${orphans.length}`),
       )
-      setNote(`Removed ${n} file${n === 1 ? '' : 's'}, freed ${mb(bytes)}.`)
+      setNote(`Deleted ${n} file${n === 1 ? '' : 's'}, freed ${mb(bytes)}.`)
       setState('done')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -41,9 +41,9 @@ export function TidyStorage() {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <button type="button" onClick={() => void run()} disabled={state === 'scanning' || state === 'removing'} className="pill pill-outline">
-        {state === 'scanning' ? 'Checking…' : state === 'removing' ? 'Removing…' : 'Tidy storage'}
+        {state === 'scanning' ? 'Checking…' : state === 'removing' ? 'Deleting…' : 'Delete unused files'}
       </button>
-      <span className="mono-label text-muted">{error ?? note ?? 'Removes audio files that no loop uses any more.'}</span>
+      <span className="mono-label text-muted">{error ?? note ?? 'Deletes audio files in storage that no loop uses any more. Safe to run any time.'}</span>
     </div>
   )
 }
