@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BulkImport } from './components/BulkImport'
+import type { Drop } from './components/BulkImport'
 import { Library } from './components/Library'
 import type { LibraryPreset } from './components/Library'
 import { Login } from './components/Login'
@@ -43,6 +44,13 @@ function Studio() {
   const [notice, setNotice] = useState<string | null>(null)
   const [showUploader, setShowUploader] = useState(false)
   const [addMode, setAddMode] = useState<'one' | 'many'>('many')
+  const [dropped, setDropped] = useState<Drop | null>(null)
+  const onDropFiles = (files: Drop['files']) => {
+    setAddMode('many')
+    setShowUploader(true)
+    setDropped({ files, nonce: Date.now() })
+    setTimeout(() => jump('add'), 30)
+  }
   const gainTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
@@ -216,6 +224,7 @@ function Studio() {
           onPlayToggle={onToggle}
           onSessions={openSessions}
           onAdd={() => { setShowUploader(true); setTimeout(() => jump('add'), 30) }}
+          onDropFiles={onDropFiles}
           onTag={openTag}
           onPack={onPackFilter}
         />
@@ -329,10 +338,10 @@ function Studio() {
                   One loop
                 </button>
               </div>
-              {addMode === 'many' ? <BulkImport buckets={buckets} onDone={reload} /> : <Uploader buckets={buckets} onAdded={onAdded} />}
+              {addMode === 'many' ? <BulkImport buckets={buckets} onDone={reload} dropped={dropped} /> : <Uploader buckets={buckets} onAdded={onAdded} />}
             </>
           ) : (
-            <p className="mono-label text-muted">Import a folder from here, or run the desktop importer. Either way it lands on the shelf.</p>
+            <p className="mono-label text-muted">Drop a folder on the basket and it lands on the shelf as a pack. Or open this and pick files from your computer.</p>
           )}
         </Section>
 
