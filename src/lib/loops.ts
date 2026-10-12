@@ -327,3 +327,52 @@ export async function deleteLoop(loop: Loop): Promise<void> {
   const paths = [data.storage_path, data.original_path].filter((p): p is string => !!p)
   if (paths.length) await supabase.storage.from(BUCKET).remove(paths)
 }
+
+// ---- storage housekeeping ----------------------------------------------------
+
+export type StoredFile = { path: string; size: number }
+
+/** Every audio file in this user's folder (calibration clicks excluded). */
+export async function listStorageFiles(): Promise<StoredFile[]> {
+  const uid = await currentUserId()
+  const out: StoredFile[] = []
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase.storage.from(BUCKET).list(uid, { limit: 1000, offset })
+    if (error) throw new Error(error.message)
+    for (const f of data) {
+      if (!f.id) continue // a folder (calibration/)
+      const size = (f.metadata as { size?: number } | null)?.size ?? 0
+      out.push({ path: `${uid}/${f.name}`, size })
+    }
+    if (data.length < 1000) break
+  }
+  return out
+}
+
+/** Files in storage that no loop row points at any more. */
+export async function orphanedFiles(): Promise<StoredFile[]> {
+  const referenced = new Set<string>()
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from('loops').select('storage_path,original_path').range(from, from + 999)
+    if (error) throw new Error(error.message)
+    for (const r of data as { storage_path: string | null; original_path: string | null }[]) {
+      if (r.storage_path) referenced.add(r.storage_path)
+      if (r.original_path) referenced.add(r.original_path)
+    }
+    if (data.length < 1000) break
+  }
+  return (await listStorageFiles()).filter((f) => !referenced.has(f.path))
+}
+
+/** Remove files in batches; returns how many were removed. */
+export async function removeFiles(paths: string[], onProgress?: (done: number) => void): Promise<number> {
+  let done = 0
+  for (let i = 0; i < paths.length; i += 100) {
+    const batch = paths.slice(i, i + 100)
+    const { error } = await supabase.storage.from(BUCKET).remove(batch)
+    if (error) throw new Error(error.message)
+    done += batch.length
+    onProgress?.(done)
+  }
+  return done
+}

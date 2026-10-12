@@ -9,6 +9,7 @@ import { Room } from './components/Room'
 import { Section } from './components/Section'
 import { Sessions } from './components/Sessions'
 import { SetPassword } from './components/SetPassword'
+import { TidyStorage } from './components/TidyStorage'
 import { Uploader } from './components/Uploader'
 import { useEngine } from './hooks/useEngine'
 import { useSession } from './hooks/useSession'
@@ -339,6 +340,7 @@ function Studio() {
                 </button>
               </div>
               {addMode === 'many' ? <BulkImport buckets={buckets} onDone={reload} dropped={dropped} /> : <Uploader buckets={buckets} onAdded={onAdded} />}
+              <TidyStorage />
             </>
           ) : (
             <p className="mono-label text-muted">Drop a folder on the basket and it lands on the shelf as a pack. Or open this and pick files from your computer.</p>
