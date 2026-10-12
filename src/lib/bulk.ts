@@ -69,6 +69,22 @@ export function makeItems(files: FileList | File[]): BulkItem[] {
  * thread, upload, register. Sequential, so a phone or laptop stays usable.
  * `update` is called after every status change with the current item.
  */
+/**
+ * Items from a drag-and-drop: the dropped folder's name is the pack and
+ * deeper folders the category. Paths keep the top folder so re-dropping
+ * the same pack is recognised as already imported.
+ */
+export function makeDroppedItems(dropped: { file: File; path: string }[]): BulkItem[] {
+  const out: BulkItem[] = []
+  let id = 0
+  for (const { file, path } of dropped) {
+    if (!/\.(wav|aif|aiff|flac|mp3|m4a)$/i.test(file.name)) continue
+    const { pack, category } = packFromPath(path, null)
+    out.push({ id: id++, file, relPath: path, pack, category, status: 'queued', bpm: null, bars: 2, kind: 'sample', key: null, source: null, error: null })
+  }
+  return out
+}
+
 export async function runBulkImport(
   items: BulkItem[],
   opts: BulkOptions,

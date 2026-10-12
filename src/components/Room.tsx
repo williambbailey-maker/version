@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Pack } from '../lib/loops'
 import type { PackStats } from '../lib/packs'
+import { dragHasFiles, readDrop } from '../lib/drop'
+import type { DroppedFile } from '../lib/drop'
 import type { RoomMap, RoomObject } from '../lib/room'
 
 type Props = {
@@ -14,6 +16,7 @@ type Props = {
   onPlayToggle: () => void
   onSessions: () => void
   onAdd: () => void
+  onDropFiles: (files: DroppedFile[]) => void
   onTag: (tag: string) => void
   onPack: (id: string) => void
 }
@@ -27,9 +30,10 @@ const PER_SHELF = 6
  * between rooms; phones stack them.
  */
 export function Room(props: Props) {
-  const { playing, masterBPM, tagCounts, packs, packStats, sessionsCount, roomMap, onPlayToggle, onSessions, onAdd, onTag, onPack } = props
+  const { playing, masterBPM, tagCounts, packs, packStats, sessionsCount, roomMap, onPlayToggle, onSessions, onAdd, onDropFiles, onTag, onPack } = props
   const [room, setRoom] = useState(0)
   const [page, setPage] = useState(0)
+  const [basketOver, setBasketOver] = useState(false)
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -212,7 +216,18 @@ export function Room(props: Props) {
       </g>
 
       {/* basket under the desk → add loops */}
-      <g {...hotProps('Basket: add loops', onAdd)}>
+      <g
+        {...hotProps('Basket: add loops, or drop folders here', onAdd)}
+        className={['hot', basketOver ? 'on' : ''].join(' ')}
+        onDragEnter={(e) => { if (dragHasFiles(e.dataTransfer)) { e.preventDefault(); setBasketOver(true) } }}
+        onDragOver={(e) => { if (dragHasFiles(e.dataTransfer)) { e.preventDefault(); setBasketOver(true) } }}
+        onDragLeave={() => setBasketOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setBasketOver(false)
+          void readDrop(e.dataTransfer).then(onDropFiles)
+        }}
+      >
         <rect x="636" y="326" width="128" height="84" fill="transparent" />
         <path className="w" d="M646 350h108l-10 54h-88z" />
         <ellipse className="w" cx="700" cy="350" rx="54" ry="8" />
@@ -220,7 +235,7 @@ export function Room(props: Props) {
         <path className="l" d="M670 344c6-16 54-16 60 0" />
         <g className="tip">
           <rect x="645" y="304" width="110" height="20" rx="10" />
-          <text x="700" y="318" textAnchor="middle">ADD LOOPS</text>
+          <text x="700" y="318" textAnchor="middle">{basketOver ? 'DROP TO IMPORT' : 'ADD LOOPS'}</text>
         </g>
       </g>
 
