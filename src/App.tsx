@@ -12,6 +12,7 @@ import { SetPassword } from './components/SetPassword'
 import { TidyStorage } from './components/TidyStorage'
 import { Uploader } from './components/Uploader'
 import { useEngine } from './hooks/useEngine'
+import { neighborSample } from './lib/neighbors'
 import { useSession } from './hooks/useSession'
 import { codecKey, codecStartOffset } from './lib/calibration'
 import { DEV_LOOPS } from './lib/devLoops'
@@ -87,6 +88,24 @@ function Studio() {
         setError(null)
         await prepare(loop)
         await engine.select(loop)
+      } catch (e) {
+        fail(e)
+      }
+    })()
+  }
+
+  /** ‹ › on a mixer column: swap in the previous/next sample from the same pack. */
+  const onStep = (loop: Loop, dir: 1 | -1) => {
+    const next = neighborSample(library, loop, dir)
+    if (!next) {
+      setNotice('Nothing else in this pack to step to.')
+      return
+    }
+    void (async () => {
+      try {
+        setError(null)
+        await prepare(next)
+        await engine.replaceSample(loop.id, next)
       } catch (e) {
         fail(e)
       }
@@ -290,6 +309,7 @@ function Studio() {
             onMute={(loop, m) => engine.setMuted(loop.id, m)}
             onSolo={(loop, v) => engine.setSolo(loop.id, v)}
             onSpeed={(loop, v) => engine.setSpeed(loop.id, v)}
+            onStep={onStep}
             boost={engine.boost}
             onBoost={engine.setBoost}
             onBoostPreset={engine.setBoostPreset}

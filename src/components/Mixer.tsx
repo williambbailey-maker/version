@@ -19,13 +19,15 @@ type Props = {
   onMute: (loop: Loop, muted: boolean) => void
   onSolo: (loop: Loop, solo: boolean) => void
   onSpeed: (loop: Loop, speed: 1 | 2) => void
+  /** Step this column to the previous/next sample in its pack. */
+  onStep: (loop: Loop, dir: 1 | -1) => void
   boost: BoostState
   onBoost: (on: boolean) => void
   onBoostPreset: (id: string) => void
 }
 
 /** What's playing (or queued): one stripe column each. */
-export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, boost, onBoost, onBoostPreset }: Props) {
+export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, onStep, boost, onBoost, onBoostPreset }: Props) {
   const cols: { slot: SlotState; loop: Loop; removable: boolean }[] = []
   const d = drums.loop ?? drums.pending
   if (d) cols.push({ slot: drums, loop: d, removable: false })
@@ -116,6 +118,14 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
             <span className="mono-label truncate font-bold">{loop.name}</span>
             {removable ? (
               <div className="flex flex-col items-center gap-1.5 self-stretch">
+                <div className="flex gap-1.5">
+                  <button type="button" aria-label={`Previous sample in place of ${loop.name}`} title="Previous in this pack" onClick={() => onStep(loop, -1)} className="pill pill-outline min-h-10 min-w-12 px-3 text-[13px]">
+                    ‹
+                  </button>
+                  <button type="button" aria-label={`Next sample in place of ${loop.name}`} title="Next in this pack" onClick={() => onStep(loop, 1)} className="pill pill-outline min-h-10 min-w-12 px-3 text-[13px]">
+                    ›
+                  </button>
+                </div>
                 <button type="button" aria-label={`Stop ${loop.name}`} onClick={() => onRemove(loop)} className="pill min-h-10 min-w-14 px-4 text-[13px]">
                   ×
                 </button>

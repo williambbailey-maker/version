@@ -143,6 +143,40 @@ export class Engine {
     this.emit()
   }
 
+  /**
+   * Swap one active sample for another on the next bar, keeping the
+   * column's position, level, mute, solo and speed.
+   */
+  async replaceSample(oldId: string, loop: Loop): Promise<void> {
+    if (!this.samples.has(oldId)) return this.select(loop)
+    if (this.samples.has(loop.id) || loop.id === oldId) return
+    if (!isPowerOfTwoBars(loop.bars)) {
+      throw new RangeError(`Loop "${loop.name}" has ${loop.bars} bars; must be 1, 2, 4 or 8`)
+    }
+    const loaded = await this.load(loop)
+    const old = this.samples.get(oldId)
+    if (!old) return // taken out while loading
+    const slot = new Slot(this.ctx, 'sample', this.master)
+    slot.muted = old.muted
+    slot.solo = old.solo
+    slot.speed = old.speed
+    this.samples = new Map([...this.samples.entries()].map(([id, s]) => (id === oldId ? [loop.id, slot] : [id, s])))
+    const now = this.ctx.currentTime
+    const at = this.playing ? this.transport.nextBar(now, SWAP_MIN_LEAD) : now
+    old.dispose(at)
+    if (this.playing) {
+      slot.start(loaded, at, this.rateFor(slot, loaded))
+      slot.setGain(old.level) // keep the column's level, not the new loop's stored one
+      this.applyMix(at)
+    } else {
+      slot.setPending(loaded)
+      slot.setGain(old.level)
+      this.settleClock()
+      this.applyMix()
+    }
+    this.emit()
+  }
+
   /** Take a sample out (bar-quantized while playing). No-op if not active. */
   removeSample(loopId: string): void {
     const slot = this.samples.get(loopId)
