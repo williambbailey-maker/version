@@ -117,7 +117,7 @@ describe('combineEstimates', () => {
   it('falls back to analysis when the file is not trimmed to a bar', () => {
     const r = combineEstimates({ filenameBPM: null, duration: 7.1, audioBPM: 101.2 })
     expect(r.source).toBe('audio')
-    expect(r.bpm).toBe(101.2)
+    expect(r.bpm).toBe(101) // whole BPMs only
     expect(r.bars).toBe(4) // 7.1 s at 101 ≈ 3 bars → nearest power of two in ratio terms is 4
   })
 
@@ -135,10 +135,12 @@ describe('combineEstimates', () => {
 })
 
 describe('tidy', () => {
-  it('snaps near-integers and keeps one decimal otherwise', () => {
+  it('rounds to the nearest whole BPM', () => {
     expect(tidy(91.98)).toBe(92)
     expect(tidy(92.04)).toBe(92)
-    expect(tidy(92.26)).toBe(92.3)
+    expect(tidy(92.26)).toBe(92)
+    expect(tidy(92.5)).toBe(93)
+    expect(combineEstimates({ filenameBPM: 101.4, duration: null, audioBPM: null }).bpm).toBe(101)
   })
 })
 

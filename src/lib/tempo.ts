@@ -222,8 +222,9 @@ export function combineEstimates(input: {
   const { filenameBPM, duration, audioBPM } = input
 
   if (filenameBPM !== null) {
-    const bars = duration ? guessBars(duration, filenameBPM) : 2
-    return { bpm: filenameBPM, bars, source: 'filename', audioBPM }
+    const bpm = tidy(filenameBPM)
+    const bars = duration ? guessBars(duration, bpm) : 2
+    return { bpm, bars, source: 'filename', audioBPM }
   }
 
   const candidates = duration ? candidatesFromDuration(duration) : []
@@ -260,11 +261,9 @@ export function combineEstimates(input: {
   return { bpm: null, bars: 2, source: 'none', audioBPM }
 }
 
-/** Snap to an integer when within 0.05, else one decimal. */
+/** Loop tempos are whole numbers in Loop Lab: round to the nearest BPM. */
 export function tidy(bpm: number): number {
-  const r = Math.round(bpm)
-  if (Math.abs(bpm - r) < 0.05) return r
-  return Math.round(bpm * 10) / 10
+  return Math.round(bpm)
 }
 
 /** Full pipeline for an uploaded file. `decode` is injected so this stays testable. */

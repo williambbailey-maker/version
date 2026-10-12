@@ -40,7 +40,7 @@ export function Uploader({ buckets, onAdded }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const bpmNum = Number(bpm)
+  const bpmNum = Math.round(Number(bpm))
   const bpmOk = Number.isFinite(bpmNum) && bpmNum > 0
   const duration = buffer?.duration ?? null
 
