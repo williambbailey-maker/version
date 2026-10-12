@@ -123,7 +123,7 @@ export function Room(props: Props) {
       </g>
 
       {/* desk: a warm wood top */}
-      <rect className="l" x="150" y="300" width="800" height="16" rx="3" fill="#dfc7a3" />
+      <rect className="l" x="150" y="300" width="800" height="16" rx="3" style={{ fill: "#dfc7a3" }} />
       <path className="l" d="M156 310h788" style={{ strokeWidth: 1.2, opacity: 0.6 }} />
       <path className="l" d="M175 316v90M925 316v90M175 380h60M925 380h-60" />
 
