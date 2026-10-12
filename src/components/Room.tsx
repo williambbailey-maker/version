@@ -76,20 +76,29 @@ export function Room(props: Props) {
     <svg className={['scene block h-auto w-full', playing ? 'playing' : ''].join(' ')} viewBox="0 0 1000 420" role="group" aria-label="The desk">
       <defs>
         <clipPath id="win">
-          <rect x="640" y="60" width="220" height="150" />
+          <rect x="200" y="50" width="670" height="164" />
         </clipPath>
       </defs>
+      {/* the view outside: sun and drifting clouds, clipped to the window */}
       <g clipPath="url(#win)">
+        <g className="sun">
+          <circle className="l" cx="790" cy="100" r="18" />
+          <path className="l" d="M790 72v-8M790 128v8M762 100h-8M818 100h8M770 80l-6-6M810 120l6 6M810 80l6-6M770 120l-6 6" />
+        </g>
         <g className="cloud">
-          <path className="l" d="M600 140c-14 0-22-9-22-19 0-13 12-21 24-18 4-13 18-20 30-14 8-8 25-6 29 6 12-3 24 5 24 16 0 12-10 20-22 20z" />
+          <path className="l" d="M300 130c-14 0-22-9-22-19 0-13 12-21 24-18 4-13 18-20 30-14 8-8 25-6 29 6 12-3 24 5 24 16 0 12-10 20-22 20z" />
         </g>
         <g className="cloud b">
-          <path className="l" d="M540 190c-10 0-16-6-16-13 0-9 9-15 17-13 3-9 13-14 21-10 6-6 18-4 21 4 9-2 17 4 17 11 0 9-7 14-16 14z" />
+          <path className="l" d="M230 190c-10 0-16-6-16-13 0-9 9-15 17-13 3-9 13-14 21-10 6-6 18-4 21 4 9-2 17 4 17 11 0 9-7 14-16 14z" />
+        </g>
+        <g className="cloud c">
+          <path className="l" d="M560 96c-12 0-19-8-19-16 0-11 10-18 20-15 3-11 15-17 25-12 7-7 21-5 24 5 10-2 20 4 20 13 0 10-8 17-18 17z" />
         </g>
       </g>
-      <rect className="l" x="640" y="60" width="220" height="150" rx="3" />
-      <line className="l" x1="750" y1="60" x2="750" y2="210" />
-      <line className="l" x1="640" y1="135" x2="860" y2="135" />
+      <rect className="l" x="200" y="50" width="670" height="164" rx="3" />
+      <line className="l" x1="423" y1="50" x2="423" y2="214" />
+      <line className="l" x1="647" y1="50" x2="647" y2="214" />
+      <line className="l" x1="200" y1="132" x2="870" y2="132" />
 
 
       {/* analogue wall clock */}
@@ -113,8 +122,9 @@ export function Room(props: Props) {
         </g>
       </g>
 
-      {/* desk */}
-      <rect className="w" x="150" y="300" width="800" height="16" rx="3" />
+      {/* desk: a warm wood top */}
+      <rect className="l" x="150" y="300" width="800" height="16" rx="3" style={{ fill: "#dfc7a3" }} />
+      <path className="l" d="M156 310h788" style={{ strokeWidth: 1.2, opacity: 0.6 }} />
       <path className="l" d="M175 316v90M925 316v90M175 380h60M925 380h-60" />
 
       {/* plant on the left */}
@@ -122,6 +132,29 @@ export function Room(props: Props) {
         <path className="l" d="M120 300v-60M120 250c-20-10-30-30-28-52 22 4 34 22 28 52zM120 268c18-12 40-10 50 6-16 12-40 10-50-6zM120 236c-14-16-14-40-2-58 12 14 14 38 2 58z" />
       </g>
       <path className="w" d="M96 300h48l-6 44H102z" />
+
+      {/* hanging fern, in front of the window */}
+      <g className="leaf fern">
+        <path className="l" d="M560 0v46" />
+        <path className="w" d="M540 46h40l-5 26h-30z" />
+        <path className="l" d="M560 72c-16 6-34 30-34 66M560 72c-8 10-16 36-10 70M560 72c8 10 16 36 10 70M560 72c16 6 34 30 34 66M560 72c-26-2-46 10-56 30M560 72c26-2 46 10 56 30" />
+        <path className="l" d="M538 96l-8-2M532 112l-8-1M528 128l-7 1M552 96l-7-4M548 114l-7-2M547 130l-6 0M568 96l7-4M572 114l7-2M573 130l6 0M582 96l8-2M588 112l8-1M592 128l7 1M528 88l-4-6M516 96l-5-5M604 88l4-6M616 96l5-5" />
+      </g>
+
+      {/* trailing vine, hanging above the mic */}
+      <g className="leaf vine">
+        <path className="l" d="M216 0v38" />
+        <path className="w" d="M198 38h36l-4 22h-28z" />
+        <path className="l" d="M208 60c-8 28-10 56-2 90M226 60c8 24 8 56-4 96" />
+        <path className="l" d="M205 84c-10-3-14-11-10-18 8 2 13 9 10 18zM203 112c-10-1-15-8-13-16 9 1 15 7 13 16zM205 140c-10-2-14-10-10-18 8 2 12 10 10 18zM228 90c10-3 14-11 10-18-8 2-13 9-10 18zM230 120c10-1 15-8 13-16-9 1-15 7-13 16zM224 150c10-2 14-10 10-18-8 2-12 10-10 18z" />
+      </g>
+
+      {/* broad-leaf plant on the right end of the desk */}
+      <g className="leaf desk">
+        <path className="l" d="M906 300v-50" />
+        <path className="l" d="M906 262c-22-6-36-26-34-50 22 6 36 26 34 50zM906 250c20-12 44-10 54 8-18 12-42 10-54-8zM906 240c-16-14-18-40-6-60 14 14 18 40 6 60zM906 226c6-22 24-36 44-36-4 22-20 36-44 36z" />
+      </g>
+      <path className="w" d="M884 300l-5-34h54l-5 34z" />
 
       {/* turntable → play/stop */}
       <g {...hotProps(playing ? 'Turntable: stop' : 'Turntable: play', onPlayToggle)}>
