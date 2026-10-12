@@ -140,6 +140,31 @@ describe('Engine', () => {
     expect(starts[starts.length - 1]!.rate).toBeCloseTo(1, 10)
   })
 
+  it('replaceSample swaps on the next bar and keeps position, level, mute and speed', async () => {
+    const { engine, calls, ctx } = make()
+    await engine.select(loop('d', 'drums', 100))
+    await engine.select(loop('a', 'sample', 88))
+    await engine.select(loop('b', 'sample', 120, 1))
+    engine.setGain('a', 0.42)
+    engine.setMuted('a', true)
+    engine.setSpeed('a', 2)
+    await engine.play()
+    const t0 = engine.transport.transportStart!
+    ctx.currentTime = t0 + 1
+    await engine.replaceSample('a', loop('c', 'sample', 110))
+    const stopA = calls.find((c) => c.kind === 'stop' && c.loop === 'a')!
+    const startC = calls.find((c) => c.kind === 'start' && c.loop === 'c')!
+    expect(stopA.at).toBeCloseTo(t0 + 2.4, 10)
+    expect(startC.at).toBeCloseTo(t0 + 2.4, 10)
+    expect(startC.rate).toBeCloseTo((100 / 110) * 2, 10)
+    expect(engine.state.samples.map((s) => s.loop?.id)).toEqual(['c', 'b'])
+    const c = engine.state.samples[0]!
+    expect(c.gain).toBeCloseTo(0.42, 10)
+    expect(c.muted).toBe(true)
+    expect(c.speed).toBe(2)
+    expect(engine.isActive('a')).toBe(false)
+  })
+
   it('refuses to play with nothing chosen', async () => {
     const { engine } = make()
     await expect(engine.play()).rejects.toThrow(/drum loop or a sample/)
