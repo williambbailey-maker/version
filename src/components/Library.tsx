@@ -3,9 +3,11 @@ import type { FormEvent } from 'react'
 import type { Loop, LoopKind } from '../engine/types'
 import type { Bucket, LoopPatch, Pack, PackPatch } from '../lib/loops'
 import { parseTagInput } from '../lib/loops'
+import { packKeyOf } from '../lib/groups'
 import { matches, parseQuery, tagCounts } from '../lib/search'
+import { Browser } from './Browser'
 import { PackEditor } from './Packs'
-import { ROW_COLS, SampleRow } from './SampleRow'
+import { SampleRow } from './SampleRow'
 
 /** Applied when it changes: lets the studio open "#percussion, closest tempo first". */
 export type LibraryPreset = { query: string; sort: 'name' | 'tempo'; nonce: number }
@@ -22,6 +24,8 @@ type Props = {
   isActive: (loop: Loop) => boolean
   loadingIds: readonly string[]
   onSelect: (loop: Loop) => void
+  onReplace: (oldId: string, loop: Loop) => void
+  onStop: (loopId: string) => void
   onRemove: (loop: Loop) => void
   onEdit: (loop: Loop, patch: LoopPatch) => Promise<void>
   onCreateBucket: (name: string) => Promise<void>
@@ -39,7 +43,7 @@ const pill = (active: boolean, extra = '') => ['pill', active ? '' : 'pill-outli
  * sample ledger they apply to.
  */
 export function Library(props: Props) {
-  const { loops, buckets, packs, packFilter, onPackFilter, onEditPack, preset, masterBPM, isActive, loadingIds, onSelect, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
+  const { loops, buckets, packs, packFilter, onPackFilter, onEditPack, preset, masterBPM, isActive, loadingIds, onSelect, onReplace, onStop, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
   const packById = useMemo(() => new Map(packs.map((p) => [p.id, p])), [packs])
   const extra = (l: Loop) => {
     const p = l.packId ? packById.get(l.packId) : undefined
@@ -58,12 +62,10 @@ export function Library(props: Props) {
   const [open, setOpen] = useState<Record<LoopKind, boolean>>({ drums: true, sample: true })
   const [key, setKey] = useState<string | null>(null)
   const [tight, setTight] = useState(false) // ≤ 20% stretch
-  const [sort, setSort] = useState<'name' | 'tempo'>('name')
 
   useEffect(() => {
     if (!preset) return
     setQ(preset.query)
-    setSort(preset.sort)
     setOpen({ drums: true, sample: true })
   }, [preset])
 
@@ -71,7 +73,7 @@ export function Library(props: Props) {
   const stretch = (l: Loop) => Math.abs(masterBPM / l.bpm - 1)
 
   // Drums: only the pack filter applies.
-  const drums = useMemo(() => loops.filter((l) => l.kind === 'drums' && (!packFilter || l.packId === packFilter)), [loops, packFilter])
+  const drums = useMemo(() => loops.filter((l) => l.kind === 'drums'), [loops])
 
   // Samples, everything but the key filter, so the key chips reflect what's in view.
   const base = useMemo(() => {
@@ -82,12 +84,11 @@ export function Library(props: Props) {
       if (l.bpm < lo || l.bpm > hi) return false
       if (bucket === UNSORTED && l.bucketId) return false
       if (bucket && bucket !== UNSORTED && l.bucketId !== bucket) return false
-      if (packFilter && l.packId !== packFilter) return false
       if (tight && stretch(l) > 0.2) return false
       return matches(l, query, extra)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loops, query, minBpm, maxBpm, bucket, packFilter, packById, tight, masterBPM])
+  }, [loops, query, minBpm, maxBpm, bucket, packById, tight, masterBPM])
 
   const keys = useMemo(() => {
     const m = new Map<string, number>()
@@ -95,12 +96,10 @@ export function Library(props: Props) {
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [base])
 
-  const samples = useMemo(() => {
-    const rows = key ? base.filter((l) => l.key === key) : base
-    if (sort !== 'tempo') return rows
-    return [...rows].sort((a, b) => stretch(a) - stretch(b))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [base, key, sort, masterBPM])
+  const samples = useMemo(() => (key ? base.filter((l) => l.key === key) : base), [base, key])
+  const filtering = q.trim() !== '' || minBpm !== '' || maxBpm !== '' || bucket !== null || tight || key !== null
+  const packNames = useMemo(() => new Map(packs.map((p) => [p.id, p.name])), [packs])
+  const inSelectedPack = useMemo(() => (packFilter ? samples.filter((l) => packKeyOf(l) === packFilter).length : samples.length), [samples, packFilter])
 
   const tags = useMemo(() => tagCounts(base).slice(0, 24), [base])
 
@@ -149,7 +148,6 @@ export function Library(props: Props) {
     ) : null
 
   const drumsVisible = drums.slice(0, shown.drums)
-  const samplesVisible = samples.slice(0, shown.sample)
 
   return (
     <div className="flex flex-col gap-10">
@@ -261,7 +259,7 @@ export function Library(props: Props) {
 
       {/* ---- Samples */}
       <div className="flex flex-col gap-4">
-        {heading('sample', 'Samples', samples.length)}
+        {heading('sample', 'Samples', inSelectedPack)}
         {open.sample && (
           <>
             <div className="flex gap-4">
@@ -300,9 +298,6 @@ export function Library(props: Props) {
               <button type="button" onClick={() => setTight((v) => !v)} aria-pressed={tight} className={pill(tight)} title="Only samples within 20% of the drum tempo">
                 ≤ 20% stretch
               </button>
-              <button type="button" onClick={() => setSort((v) => (v === 'tempo' ? 'name' : 'tempo'))} aria-pressed={sort === 'tempo'} className={pill(sort === 'tempo')}>
-                Closest tempo first
-              </button>
               {keys.length > 0 && (
                 <label className="mono-label ml-2 flex items-center gap-2 text-muted">
                   Key
@@ -334,52 +329,55 @@ export function Library(props: Props) {
               </div>
             )}
 
-            {samples.length === 0 && <p className="mono-label py-4 text-muted">Nothing matches.</p>}
-            {samples.length > 0 && (
-              <div className={['mono-label hidden gap-3 border-b border-line py-2 text-muted md:grid', ROW_COLS].join(' ')}>
-                <span />
-                <span>Loop</span>
-                <span>Key</span>
-                <span>BPM</span>
-                <span>Stretch</span>
-                <span />
-              </div>
-            )}
-            <ul className="grid gap-2 md:block md:gap-0">
-              {samplesVisible.map((loop, i) => (
-                <Fragment key={loop.id}>
-                  <SampleRow
-                    loop={loop}
-                    index={i + 1}
-                    packName={loop.packId ? (packById.get(loop.packId)?.name ?? null) : null}
-                    masterBPM={masterBPM}
-                    active={isActive(loop)}
-                    loading={loadingIds.includes(loop.id)}
-                    onSelect={() => onSelect(loop)}
-                    onEdit={loop.storagePath ? () => setEditing(editing === loop.id ? null : loop.id) : null}
-                    onRemove={() => onRemove(loop)}
-                    removeLabel={isActive(loop) ? '×' : 'Del'}
-                  />
-                  {editing === loop.id && (
-                    <li>
-                      <LoopEditor
+            <Browser
+              samples={samples}
+              packNames={packNames}
+              selected={packFilter}
+              onSelectPack={onPackFilter}
+              masterBPM={masterBPM}
+              isActive={isActive}
+              loadingIds={loadingIds}
+              onToggle={onSelect}
+              onReplace={onReplace}
+              onStop={onStop}
+              filtering={filtering}
+              renderRows={(rows) => (
+                <ul className="grid gap-2 md:block md:gap-0">
+                  {rows.map((loop, i) => (
+                    <Fragment key={loop.id}>
+                      <SampleRow
                         loop={loop}
-                        buckets={buckets}
-                        packs={packs}
-                        onSave={async (patch) => {
-                          await onEdit(loop, patch)
-                          setEditing(null)
-                        }}
-                        onCancel={() => setEditing(null)}
+                        index={i + 1}
+                        packName={loop.packId ? (packById.get(loop.packId)?.name ?? null) : null}
+                        masterBPM={masterBPM}
+                        active={isActive(loop)}
+                        loading={loadingIds.includes(loop.id)}
+                        onSelect={() => onSelect(loop)}
+                        onEdit={loop.storagePath ? () => setEditing(editing === loop.id ? null : loop.id) : null}
+                        onRemove={() => onRemove(loop)}
+                        removeLabel={isActive(loop) ? '×' : 'Del'}
                       />
-                    </li>
-                  )}
-                </Fragment>
-              ))}
-            </ul>
+                      {editing === loop.id && (
+                        <li>
+                          <LoopEditor
+                            loop={loop}
+                            buckets={buckets}
+                            packs={packs}
+                            onSave={async (patch) => {
+                              await onEdit(loop, patch)
+                              setEditing(null)
+                            }}
+                            onCancel={() => setEditing(null)}
+                          />
+                        </li>
+                      )}
+                    </Fragment>
+                  ))}
+                </ul>
+              )}
+            />
           </>
         )}
-        {more('sample', samples.length, samplesVisible.length)}
       </div>
     </div>
   )

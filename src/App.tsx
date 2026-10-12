@@ -40,7 +40,21 @@ function Studio() {
   const [buckets, setBuckets] = useState<Bucket[]>([])
   const [packs, setPacks] = useState<Pack[]>([])
   const [sessions, setSessions] = useState<Session[] | null>(null)
-  const [packFilter, setPackFilter] = useState<string | null>(null)
+  const [packFilter, setPackFilter] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('looplab.pack')
+    } catch {
+      return null
+    }
+  })
+  useEffect(() => {
+    try {
+      if (packFilter) localStorage.setItem('looplab.pack', packFilter)
+      else localStorage.removeItem('looplab.pack')
+    } catch {
+      // private mode
+    }
+  }, [packFilter])
   const [preset, setPreset] = useState<LibraryPreset | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -206,7 +220,6 @@ function Studio() {
 
   // ---- studio actions
   const openTag = (tag: string) => {
-    setPackFilter(null)
     setPreset({ query: `#${tag}`, sort: 'tempo', nonce: Date.now() })
     jump('library')
   }
@@ -332,6 +345,18 @@ function Studio() {
               isActive={isActive}
               loadingIds={engine.loading}
               onSelect={onSelect}
+              onReplace={(oldId, loop) => {
+                void (async () => {
+                  try {
+                    setError(null)
+                    await prepare(loop)
+                    await engine.replaceSample(oldId, loop)
+                  } catch (e) {
+                    fail(e)
+                  }
+                })()
+              }}
+              onStop={(id) => engine.removeSample(id)}
               onRemove={onRemove}
               onEdit={onEdit}
               onCreateBucket={onCreateBucket}
