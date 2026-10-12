@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { makeDroppedItems } from './bulk'
+import { autoKind, autoTags, makeDroppedItems } from './bulk'
 
 const f = (name: string) => new File([new Uint8Array(4)], name)
 
@@ -28,5 +28,21 @@ describe('makeDroppedItems', () => {
     expect(items).toHaveLength(1)
     expect(items[0]!.pack).toBeNull()
     expect(items[0]!.status).toBe('queued')
+  })
+})
+
+describe('auto kind and tags', () => {
+  it('only loose files named like drums become drums; pack contents are samples', () => {
+    expect(autoKind('11OCT26 - Drums 2.wav', null)).toBe('drums')
+    expect(autoKind('my beat.wav', null)).toBe('drums')
+    expect(autoKind('AL HUG/Loops/Percussion/AL_HUG_70_percussion_claps.wav', 'AL HUG')).toBe('sample')
+    expect(autoKind('Pack/Drums/break_01.wav', 'Pack')).toBe('sample')
+    expect(autoKind('trombone.wav', null)).toBe('sample')
+  })
+
+  it('percussion folders earn the percussion tag once', () => {
+    expect(autoTags('Pack/Loops/Percussion/x.wav', ['soul'])).toEqual(['soul', 'percussion'])
+    expect(autoTags('Pack/Loops/Percussion/x.wav', ['percussion'])).toEqual(['percussion'])
+    expect(autoTags('Pack/Keys/x.wav', [])).toEqual([])
   })
 })

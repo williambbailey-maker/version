@@ -36,7 +36,24 @@ export type BulkOptions = {
   packInfo: PackPatch | null
 }
 
-const DRUMS_RE = /drum|beat|break|perc|kick|top/i
+const DRUMS_RE = /drum|beat|break/i
+const PERC_RE = /perc/i
+
+/**
+ * Kind for an auto-classified file. Your own recordings (no pack) named
+ * like drums are drums; anything inside a sample pack is a sample, even a
+ * pack's "Drums" or "Percussion" folder, since packs feed the sample row.
+ */
+export function autoKind(relPath: string, pack: string | null): LoopKind {
+  return !pack && DRUMS_RE.test(relPath) ? 'drums' : 'sample'
+}
+
+/** Tags a file earns from its path, on top of the tags typed for the batch. */
+export function autoTags(relPath: string, base: string[]): string[] {
+  const out = [...base]
+  if (PERC_RE.test(relPath) && !out.includes('percussion')) out.push('percussion')
+  return out
+}
 
 /** The picked folder's name, if the selection came from a folder picker. */
 export function rootFolderName(files: FileList | File[]): string | null {
@@ -126,7 +143,7 @@ export async function runBulkImport(
       const est = await estimateLoop(item.file, (bytes) => getContext().decodeAudioData(bytes))
       if (!est.buffer) throw new Error('Could not decode this file')
       item.key = keyFromFilename(item.file.name)
-      item.kind = opts.kind !== 'auto' ? opts.kind : DRUMS_RE.test(item.relPath) ? 'drums' : 'sample'
+      item.kind = opts.kind !== 'auto' ? opts.kind : autoKind(item.relPath, item.pack)
       item.source = est.source
       if (est.bpm === null) {
         if (item.bpm === null) {
@@ -166,7 +183,7 @@ export async function runBulkImport(
         kind: item.kind,
         key: item.key,
         duration: est.buffer.duration,
-        tags: opts.tags,
+        tags: autoTags(item.relPath, opts.tags),
         bucketId: opts.bucketId,
         sourcePath: item.relPath,
         pack: item.pack,
