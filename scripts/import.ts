@@ -41,6 +41,7 @@ import { readableSampleName } from '../src/lib/naming'
 import { packFromPath } from '../src/lib/packs'
 import { extractPageInfo } from '../src/lib/pageinfo'
 import type { Bars, LoopKind } from '../src/engine/types'
+import { defaultGain } from '../src/engine/types'
 
 const exec = promisify(execFile)
 
@@ -355,6 +356,7 @@ async function main(): Promise<void> {
             bars: est.bars as Bars,
             kind,
             key,
+            gain: defaultGain(kind),
             duration,
             size_bytes: statSync(file).size,
             tags: args.tags,

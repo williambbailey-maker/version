@@ -1,4 +1,5 @@
 import type { Bars, Loop, LoopKind } from '../engine/types'
+import { defaultGain } from '../engine/types'
 import { BUCKET, supabase } from './supabase'
 
 /** Row shape of public.loops. */
@@ -280,6 +281,7 @@ export async function uploadBlob(
     bars: meta.bars,
     kind: meta.kind,
     key: meta.key ?? null,
+    gain: defaultGain(meta.kind),
     duration: meta.duration ?? buffer?.duration ?? null,
     size_bytes: blob.size,
     tags: normalizeTags(meta.tags ?? []),
