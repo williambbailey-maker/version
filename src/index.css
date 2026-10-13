@@ -294,23 +294,10 @@
   from { transform: translateX(-120px); }
   to { transform: translateX(560px); }
 }
-.sun {
-  transform-origin: 790px 100px;
-  animation: spin 120s linear infinite;
-}
+
 .leaf {
   transform-origin: 120px 300px;
   animation: sway 6s ease-in-out infinite;
-}
-.leaf.fern {
-  transform-origin: 560px 0px;
-  animation-duration: 7s;
-  animation-delay: -2s;
-}
-.leaf.vine {
-  transform-origin: 216px 0px;
-  animation-duration: 8s;
-  animation-delay: -5s;
 }
 .leaf.desk {
   transform-origin: 906px 300px;
@@ -349,7 +336,7 @@
   50% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cloud, .leaf, .sun, .playing .platter, .cursor-blink {
+  .cloud, .leaf, .playing .platter, .cursor-blink {
     animation: none !important;
   }
 }
