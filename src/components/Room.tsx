@@ -124,7 +124,7 @@ export function Room(props: Props) {
 
       {/* desk: solid, in the site's brown */}
       <rect className="f" x="150" y="300" width="800" height="16" rx="3" />
-      <path className="l" d="M175 316v90M925 316v90M175 380h60M925 380h-60" />
+      <path className="l" d="M175 316v90M925 316v90" />
 
       {/* plant on the left */}
       <g className="leaf">
@@ -217,7 +217,6 @@ export function Room(props: Props) {
       {/* FX pedal on the floor → tag */}
       <g {...hotProps(`FX pedal: loops tagged ${roomMap.fx}`, () => onTag(roomMap.fx))}>
         <rect x="266" y="330" width="120" height="80" fill="transparent" />
-        <path className="l" d="M246 380h30M406 380h30" />
         <rect className="w" x="276" y="336" width="100" height="68" rx="6" />
         <circle className="l" cx="298" cy="354" r="7" />
         <circle className="l" cx="326" cy="354" r="7" />
@@ -255,14 +254,19 @@ export function Room(props: Props) {
         </g>
       </g>
 
-      {/* amp on the floor → tag */}
-      <g {...hotProps(`Amp: loops tagged ${roomMap.amp}`, () => onTag(roomMap.amp))}>
-        <rect className="w" x="470" y="330" width="120" height="74" rx="4" />
-        <rect className="l" x="482" y="352" width="96" height="42" rx="3" />
-        <path className="l" d="M494 352v42M506 352v42M518 352v42M530 352v42M542 352v42M554 352v42M566 352v42" />
-        <circle className="l" cx="490" cy="341" r="3" />
-        <circle className="l" cx="504" cy="341" r="3" />
-        <circle className="l" cx="518" cy="341" r="3" />
+      {/* bass guitar on the floor, leaning under the desk → tag */}
+      <g {...hotProps(`Bass: loops tagged ${roomMap.amp}`, () => onTag(roomMap.amp))}>
+        <rect x="450" y="326" width="190" height="84" fill="transparent" />
+        <g transform="rotate(-18 530 372)">
+          <path className="w" d="M462 372c0-16 12-26 26-24 6-10 20-10 26 0 14-2 26 8 26 24s-12 26-26 24c-6 10-20 10-26 0-14 2-26-8-26-24z" />
+          <path className="w" d="M538 368h74v8h-74z" />
+          <path className="w" d="M612 362h22l5 5v12l-5 5h-22z" />
+          <path className="l" d="M618 362v-5M626 362v-5M618 384v5M626 384v5" />
+          <path className="l" d="M540 370h72M540 374h72" style={{ strokeWidth: 1.2 }} />
+          <path className="l" d="M498 360h10v24h-10z" />
+          <circle className="l" cx="522" cy="388" r="3" />
+          <circle className="l" cx="531" cy="383" r="3" />
+        </g>
         <g className="tip">
           <rect x="470" y="404" width="120" height="20" rx="10" />
           <text x="530" y="418" textAnchor="middle">{tipFor('amp')}</text>

@@ -11,7 +11,7 @@ export const ROOM_OBJECT_LABEL: Record<RoomObject, string> = {
   congas: 'Congas',
   keyboard: 'Keyboard',
   fx: 'FX pedal',
-  amp: 'Amp',
+  amp: 'Bass',
   mic: 'Mic',
   trombone: 'Trombone',
 }
