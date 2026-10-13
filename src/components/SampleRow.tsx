@@ -56,7 +56,7 @@ export function SampleRow({ loop, index, packName, masterBPM, active, loading, o
         className={[
           'group hidden min-h-[52px] cursor-pointer items-center gap-3 border-b border-line py-1.5 transition-colors duration-150 md:grid',
           ROW_COLS,
-          active ? 'bg-ink text-cream' : 'hover:bg-[#f3ece0]',
+          active ? 'bg-ink text-cream' : 'hover:bg-cream-2',
         ].join(' ')}
       >
         <span className={['mono-label text-right', active ? 'text-cream/70' : 'text-muted'].join(' ')}>{String(index).padStart(3, '0')}</span>

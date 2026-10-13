@@ -147,7 +147,7 @@ export function Room(props: Props) {
           <circle className="l" cx="470" cy="262" r="26" />
           <circle className="l" cx="470" cy="262" r="18" />
           <circle className="f" cx="470" cy="262" r="6" />
-          <circle cx="470" cy="262" r="1.5" fill="#fbf6ec" />
+          <circle cx="470" cy="262" r="1.5" fill="var(--color-cream)" />
         </g>
         <g className="needle">
           <path className="l" d="M520 226l14 30" />
@@ -297,7 +297,7 @@ export function Room(props: Props) {
       {shelfPacks.slice(0, 3).map((p, i) => tape(p, 60 + i * 270, 112))}
       {shelfPacks.slice(3, 6).map((p, i) => tape(p, 60 + i * 270, 242))}
       {packs.length === 0 && (
-        <text x="500" y="160" textAnchor="middle" fontSize="11" fill="#8a7a72">
+        <text x="500" y="160" textAnchor="middle" fontSize="11" fill="var(--color-muted)">
           THE SHELF IS EMPTY. IMPORT A FOLDER AND IT FILLS UP.
         </text>
       )}

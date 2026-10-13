@@ -8,8 +8,19 @@
   --color-accent: #e8453c;
   --color-muted: #8a7a72;
   --color-line: #dccfc0;
+  --color-cream-2: #f3ece0; /* hover / open-row tint */
   --font-sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Space Mono", ui-monospace, Menlo, monospace;
+}
+
+/* Dark mode: the same drawing on dark brown paper. Set by data-theme on <html>. */
+:root[data-theme="dark"] {
+  --color-cream: #2b1619;
+  --color-ink: #f6eadc;
+  --color-muted: #b7a197;
+  --color-line: #4e3136;
+  --color-cream-2: #3a2126;
+  color-scheme: dark;
 }
 
 @layer base {

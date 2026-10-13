@@ -137,7 +137,7 @@ export function Browser(props: Props) {
                 type="button"
                 aria-pressed={on}
                 onClick={() => pickPack(p.key)}
-                className={['flex min-h-11 w-full items-center justify-between gap-3 border-b border-line px-2 text-left transition-colors duration-150', on ? 'bg-ink text-cream' : 'hover:bg-[#f3ece0]'].join(' ')}
+                className={['flex min-h-11 w-full items-center justify-between gap-3 border-b border-line px-2 text-left transition-colors duration-150', on ? 'bg-ink text-cream' : 'hover:bg-cream-2'].join(' ')}
               >
                 <span className="min-w-0 truncate text-sm font-bold">{p.name}</span>
                 <span className={['mono-label shrink-0', on ? 'text-cream/80' : 'text-muted'].join(' ')}>{p.count}</span>
@@ -170,7 +170,7 @@ export function Browser(props: Props) {
                 type="button"
                 aria-expanded={isOpen}
                 onClick={() => open(g)}
-                className={['flex min-h-12 w-full items-center gap-3 px-2 py-2 text-left transition-colors duration-150', isOpen ? 'bg-[#f3ece0]' : 'hover:bg-[#f3ece0]'].join(' ')}
+                className={['flex min-h-12 w-full items-center gap-3 px-2 py-2 text-left transition-colors duration-150', isOpen ? 'bg-cream-2' : 'hover:bg-cream-2'].join(' ')}
               >
                 <span className="inline-block w-3 text-sm transition-transform duration-200 ease-linear" style={{ transform: isOpen ? 'rotate(90deg)' : 'none' }} aria-hidden="true">
                   ▸

@@ -1,12 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Loop, LoopKind } from '../engine/types'
-import type { Bucket, LoopPatch, Pack, PackPatch } from '../lib/loops'
+import type { Bucket, LoopPatch, Pack } from '../lib/loops'
 import { parseTagInput } from '../lib/loops'
 import { packKeyOf } from '../lib/groups'
 import { matches, parseQuery, tagCounts } from '../lib/search'
 import { Browser } from './Browser'
-import { PackEditor } from './Packs'
 import { SampleRow } from './SampleRow'
 
 /** Applied when it changes: lets the studio open "#percussion, closest tempo first". */
@@ -18,7 +17,6 @@ type Props = {
   packs: Pack[]
   packFilter: string | null
   onPackFilter: (id: string | null) => void
-  onEditPack: (pack: Pack, patch: PackPatch) => Promise<void>
   preset?: LibraryPreset | null
   masterBPM: number
   isActive: (loop: Loop) => boolean
@@ -43,13 +41,12 @@ const pill = (active: boolean, extra = '') => ['pill', active ? '' : 'pill-outli
  * sample ledger they apply to.
  */
 export function Library(props: Props) {
-  const { loops, buckets, packs, packFilter, onPackFilter, onEditPack, preset, masterBPM, isActive, loadingIds, onSelect, onReplace, onStop, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
+  const { loops, buckets, packs, packFilter, onPackFilter, preset, masterBPM, isActive, loadingIds, onSelect, onReplace, onStop, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
   const packById = useMemo(() => new Map(packs.map((p) => [p.id, p])), [packs])
   const extra = (l: Loop) => {
     const p = l.packId ? packById.get(l.packId) : undefined
     return p ? `${p.name} ${p.publisher ?? ''} ${p.genres.join(' ')}` : ''
   }
-  const selectedPack = packFilter ? packById.get(packFilter) : undefined
 
   const [q, setQ] = useState('')
   const [minBpm, setMinBpm] = useState('')
@@ -57,7 +54,6 @@ export function Library(props: Props) {
   const [bucket, setBucket] = useState<string | null>(null) // null = all
   const [newBucket, setNewBucket] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
-  const [editingPack, setEditingPack] = useState(false)
   const [shown, setShown] = useState<Record<LoopKind, number>>({ drums: PAGE, sample: PAGE })
   const [open, setOpen] = useState<Record<LoopKind, boolean>>({ drums: true, sample: true })
   const [key, setKey] = useState<string | null>(null)
@@ -151,56 +147,10 @@ export function Library(props: Props) {
 
   return (
     <div className="flex flex-col gap-10">
-      {selectedPack && (
-        <div className="flex flex-col gap-3 border border-line p-4">
-          <div className="flex gap-4">
-            {selectedPack.coverUrl ? (
-              <img src={selectedPack.coverUrl} alt="" className="h-24 w-24 shrink-0 border-[1.5px] border-ink object-cover" />
-            ) : (
-              <span className="block h-24 w-24 shrink-0 border-[1.5px] border-ink" aria-hidden="true" />
-            )}
-            <div className="flex min-w-0 flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="tag">Pack</span>
-                <span className="headline text-2xl">{selectedPack.name}</span>
-                {selectedPack.publisher && <span className="mono-label text-muted">{selectedPack.publisher}</span>}
-              </div>
-              {selectedPack.description && <p className="line-clamp-3 max-w-2xl text-sm text-ink">{selectedPack.description}</p>}
-              <div className="flex flex-wrap gap-2">
-                {selectedPack.genres.map((g) => (
-                  <span key={g} className="tag">{g}</span>
-                ))}
-                {selectedPack.url && (
-                  <a href={selectedPack.url} target="_blank" rel="noreferrer" className="pill pill-outline min-h-7 px-3">
-                    Open link
-                  </a>
-                )}
-                <button type="button" onClick={() => setEditingPack((v) => !v)} className="pill pill-outline min-h-7 px-3">
-                  {editingPack ? 'Close' : 'Edit pack'}
-                </button>
-                <button type="button" onClick={() => onPackFilter(null)} className="pill pill-outline min-h-7 px-3">
-                  All packs
-                </button>
-              </div>
-            </div>
-          </div>
-          {editingPack && (
-            <PackEditor
-              pack={selectedPack}
-              onSave={async (patch) => {
-                await onEditPack(selectedPack, patch)
-                setEditingPack(false)
-              }}
-              onCancel={() => setEditingPack(false)}
-            />
-          )}
-        </div>
-      )}
-
       {/* ---- Drums */}
       <div>
         {heading('drums', 'Drums', drums.length)}
-        {open.drums && drums.length === 0 && <p className="mono-label py-6 text-muted">No drum loops{selectedPack ? ' in this pack' : ' yet'}.</p>}
+        {open.drums && drums.length === 0 && <p className="mono-label py-6 text-muted">No drum loops yet.</p>}
         {open.drums && (
           <ul>
             {drumsVisible.map((loop, i) => {

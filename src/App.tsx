@@ -13,11 +13,13 @@ import { TidyStorage } from './components/TidyStorage'
 import { Uploader } from './components/Uploader'
 import { useEngine } from './hooks/useEngine'
 import { neighborSample } from './lib/neighbors'
+import { applyTheme, readTheme } from './lib/theme'
+import type { Theme } from './lib/theme'
 import { useSession } from './hooks/useSession'
 import { codecKey, codecStartOffset } from './lib/calibration'
 import { DEV_LOOPS } from './lib/devLoops'
-import { createBucket, deleteBucket, deleteLoop, ensureUrl, isCompressed, listBuckets, listLoops, listPacks, updateLoop, updatePack } from './lib/loops'
-import type { Bucket, LoopPatch, Pack, PackPatch } from './lib/loops'
+import { createBucket, deleteBucket, deleteLoop, ensureUrl, isCompressed, listBuckets, listLoops, listPacks, updateLoop } from './lib/loops'
+import type { Bucket, LoopPatch, Pack } from './lib/loops'
 import { packStats } from './lib/packs'
 import { DEFAULT_ROOM } from './lib/room'
 import { tagCounts } from './lib/search'
@@ -59,6 +61,12 @@ function Studio() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [showUploader, setShowUploader] = useState(false)
+  const [theme, setTheme] = useState<Theme>(() => readTheme())
+  const toggleTheme = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    applyTheme(next)
+  }
   const [addMode, setAddMode] = useState<'one' | 'many'>('many')
   const [dropped, setDropped] = useState<Drop | null>(null)
   const onDropFiles = (files: Drop['files']) => {
@@ -159,11 +167,6 @@ function Studio() {
     Object.assign(loop, patch) // keep the engine's reference in sync
   }
 
-  const onEditPack = async (pack: Pack, patch: PackPatch) => {
-    await updatePack(pack.id, patch)
-    setPacks((ps) => ps.map((p) => (p.id === pack.id ? { ...p, ...patch } : p)).sort((a, b) => a.name.localeCompare(b.name)))
-  }
-
   const onPackFilter = (id: string | null) => {
     setPackFilter(id)
     if (id) jump('library')
@@ -238,7 +241,10 @@ function Studio() {
       <header className="grid grid-cols-1 items-center gap-2 px-4 pt-5 text-center md:grid-cols-3 md:px-6 md:text-left">
         <span className="hidden md:block" />
         <span className="headline text-center text-[2.8rem] leading-none">LOOP LAB</span>
-        <span className="mono-label text-muted md:text-right">
+        <span className="mono-label flex justify-center gap-4 text-muted md:justify-end">
+          <button type="button" onClick={toggleTheme} aria-pressed={theme === 'dark'} className="underline underline-offset-4 hover:text-accent">
+            {theme === 'dark' ? 'light mode' : 'dark mode'}
+          </button>
           <button type="button" onClick={() => void supabase.auth.signOut()} className="underline underline-offset-4 hover:text-accent">
             sign out
           </button>
@@ -339,7 +345,6 @@ function Studio() {
               packs={packs}
               packFilter={packFilter}
               onPackFilter={setPackFilter}
-              onEditPack={onEditPack}
               preset={preset}
               masterBPM={engine.masterBPM}
               isActive={isActive}
