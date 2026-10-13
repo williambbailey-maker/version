@@ -79,12 +79,8 @@ export function Room(props: Props) {
           <rect x="200" y="50" width="670" height="164" />
         </clipPath>
       </defs>
-      {/* the view outside: sun and drifting clouds, clipped to the window */}
+      {/* the view outside: drifting clouds, clipped to the window */}
       <g clipPath="url(#win)">
-        <g>
-          <circle className="l" cx="836" cy="84" r="14" />
-          <path className="l" d="M836 62v-6M836 106v6M814 84h-6M858 84h6M820 68l-4-4M852 100l4 4M852 68l4-4M820 100l-4 4" />
-        </g>
         <g className="cloud">
           <path className="l" d="M300 130c-14 0-22-9-22-19 0-13 12-21 24-18 4-13 18-20 30-14 8-8 25-6 29 6 12-3 24 5 24 16 0 12-10 20-22 20z" />
         </g>
