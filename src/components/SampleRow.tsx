@@ -31,7 +31,7 @@ export function SampleRow({ loop, index, packName, masterBPM, active, loading, o
     <button
       type="button"
       aria-pressed={loop.favorite === true}
-      aria-label={loop.favorite ? `Unfavourite ${loop.name}` : `Favourite ${loop.name}`}
+      aria-label={loop.favorite ? `Unfavorite ${loop.name}` : `Favorite ${loop.name}`}
       onClick={(e) => {
         e.stopPropagation()
         onFavorite()

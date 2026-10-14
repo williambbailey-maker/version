@@ -91,7 +91,7 @@ export function Browser(props: Props) {
         <button
           type="button"
           aria-pressed={fav}
-          aria-label={fav ? `Unfavourite ${loop.name}` : `Favourite ${loop.name}`}
+          aria-label={fav ? `Unfavorite ${loop.name}` : `Favorite ${loop.name}`}
           onClick={() => onFavorite(loop)}
           className={['absolute right-1 top-1 grid h-8 w-8 place-items-center text-base leading-none transition-colors duration-150', fav ? 'text-accent' : on ? 'text-cream/50 hover:text-cream' : 'text-line hover:text-accent'].join(' ')}
         >

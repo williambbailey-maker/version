@@ -121,7 +121,7 @@ function Studio() {
     })()
   }
 
-  // ---- favourites
+  // ---- favorites
   const favorites = useMemo(() => library.filter((l) => l.kind === 'sample' && l.favorite), [library])
   const packNames = useMemo(() => new Map(packs.map((p) => [p.id, p.name])), [packs])
   const onFavorite = (loop: Loop) => {
@@ -307,7 +307,7 @@ function Studio() {
         {showFavorites && (
           <Section
             id="favorites"
-            label="Favourites"
+            label="Favorites"
             aside={
               <button type="button" onClick={() => setShowFavorites(false)} className="pill pill-outline">
                 Hide
