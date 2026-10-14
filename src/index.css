@@ -224,6 +224,16 @@
   display: none;
 }
 
+/* Record spines on the shelf: pull one out on hover, keep the open pack out. */
+.spine {
+  transition: transform 0.25s ease;
+}
+.spine:hover,
+.spine:focus-visible,
+.spine.on {
+  transform: translateY(-22px);
+}
+
 /* Studio room drawing */
 .scene * {
   stroke-linecap: round;

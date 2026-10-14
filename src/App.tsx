@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BulkImport } from './components/BulkImport'
+import { Favorites } from './components/Favorites'
 import type { Drop } from './components/BulkImport'
 import { Library } from './components/Library'
 import type { LibraryPreset } from './components/Library'
@@ -11,6 +12,7 @@ import { Sessions } from './components/Sessions'
 import { SetPassword } from './components/SetPassword'
 import { TidyStorage } from './components/TidyStorage'
 import { Uploader } from './components/Uploader'
+import { ensureRunning, getContext } from './engine/context'
 import { useEngine } from './hooks/useEngine'
 import { neighborSample } from './lib/neighbors'
 import { applyTheme, readTheme } from './lib/theme'
@@ -104,16 +106,34 @@ function Studio() {
     if (isCompressed(loop) && loop.startOffset === undefined) loop.startOffset = await codecStartOffset(codecKey(loop.storagePath ?? loop.url))
   }
 
+  /** Tapping a loop plays it: the transport starts itself on the first pick. */
   const onSelect = (loop: Loop) => {
+    void ensureRunning(getContext()) // inside the click, so Safari lets audio through
     void (async () => {
       try {
         setError(null)
         await prepare(loop)
         await engine.select(loop)
+        if (!engine.playing && engine.isActive(loop.id)) await engine.play()
       } catch (e) {
         fail(e)
       }
     })()
+  }
+
+  // ---- favourites
+  const favorites = useMemo(() => library.filter((l) => l.kind === 'sample' && l.favorite), [library])
+  const packNames = useMemo(() => new Map(packs.map((p) => [p.id, p.name])), [packs])
+  const onFavorite = (loop: Loop) => {
+    const next = !loop.favorite
+    setLoops((ls) => (ls ? ls.map((l) => (l.id === loop.id ? { ...l, favorite: next } : l)) : ls))
+    if (!loop.storagePath) return // demo loop
+    updateLoop(loop.id, { favorite: next }).catch(fail)
+  }
+  const [showFavorites, setShowFavorites] = useState(false)
+  const openFavorites = () => {
+    setShowFavorites(true)
+    setTimeout(() => jump('favorites'), 30)
   }
 
   /** ‹ › on a mixer column: swap in the previous/next sample from the same pack. */
@@ -260,7 +280,9 @@ function Studio() {
           packStats={stats}
           sessionsCount={sessions?.length ?? 0}
           roomMap={DEFAULT_ROOM}
-          onPlayToggle={onToggle}
+          selectedPack={packFilter}
+          favoritesCount={favorites.length}
+          onFavorites={openFavorites}
           onSessions={openSessions}
           onAdd={() => { setShowUploader(true); setTimeout(() => jump('add'), 30) }}
           onDropFiles={onDropFiles}
@@ -282,6 +304,28 @@ function Studio() {
       )}
 
       <div className="mt-8">
+        {showFavorites && (
+          <Section
+            id="favorites"
+            label="Favourites"
+            aside={
+              <button type="button" onClick={() => setShowFavorites(false)} className="pill pill-outline">
+                Hide
+              </button>
+            }
+          >
+            <Favorites
+              loops={favorites}
+              packNames={packNames}
+              masterBPM={engine.masterBPM}
+              isActive={isActive}
+              loadingIds={engine.loading}
+              onSelect={onSelect}
+              onRemove={onRemove}
+              onFavorite={onFavorite}
+            />
+          </Section>
+        )}
         {showSessions && (
           <Section
             id="sessions"
@@ -310,9 +354,11 @@ function Studio() {
           sub="drums set the clock, samples follow"
           aside={
             <div className="flex gap-2">
-              <button type="button" onClick={onToggle} className={['pill', engine.playing ? 'pill-accent' : ''].join(' ')}>
-                {engine.playing ? 'Stop' : 'Play'}
-              </button>
+              {engine.playing && (
+                <button type="button" onClick={onToggle} className="pill pill-accent">
+                  Stop
+                </button>
+              )}
               <button type="button" onClick={openSessions} disabled={!hasStack} className="pill pill-outline">
                 Save stack
               </button>
@@ -350,18 +396,7 @@ function Studio() {
               isActive={isActive}
               loadingIds={engine.loading}
               onSelect={onSelect}
-              onReplace={(oldId, loop) => {
-                void (async () => {
-                  try {
-                    setError(null)
-                    await prepare(loop)
-                    await engine.replaceSample(oldId, loop)
-                  } catch (e) {
-                    fail(e)
-                  }
-                })()
-              }}
-              onStop={(id) => engine.removeSample(id)}
+              onFavorite={onFavorite}
               onRemove={onRemove}
               onEdit={onEdit}
               onCreateBucket={onCreateBucket}
@@ -369,35 +404,35 @@ function Studio() {
             />
           )}
         </Section>
+        {showUploader && (
         <Section
-          id="add"
-          label="Add loops"
-          sub={showUploader ? (addMode === 'many' ? 'a folder becomes a pack' : 'one loop') : 'a folder becomes a pack'}
-          aside={
-            <button type="button" onClick={() => setShowUploader((v) => !v)} className={['pill', showUploader ? 'pill-outline' : ''].join(' ')}>
-              {showUploader ? 'Close' : 'Add loops'}
-            </button>
-          }
-        >
-          {showUploader ? (
-            <>
-              <div className="mb-6 flex gap-2">
-                <button type="button" onClick={() => setAddMode('many')} className={['pill', addMode === 'many' ? '' : 'pill-outline'].join(' ')}>
-                  Many loops
-                </button>
-                <button type="button" onClick={() => setAddMode('one')} className={['pill', addMode === 'one' ? '' : 'pill-outline'].join(' ')}>
-                  One loop
-                </button>
-              </div>
-              {addMode === 'many' ? <BulkImport buckets={buckets} onDone={reload} dropped={dropped} /> : <Uploader buckets={buckets} onAdded={onAdded} />}
-            </>
-          ) : (
-            <p className="mono-label text-muted">Drop a folder on the basket and it lands on the shelf as a pack. Or open this and pick files from your computer.</p>
-          )}
-          <div className="mt-6 border-t border-line pt-4">
-            <TidyStorage />
-          </div>
-        </Section>
+            id="add"
+            label="Add loops"
+            sub={showUploader ? (addMode === 'many' ? 'a folder becomes a pack' : 'one loop') : 'a folder becomes a pack'}
+            aside={
+              <button type="button" onClick={() => setShowUploader(false)} className="pill pill-outline">
+                Hide
+              </button>
+            }
+          >
+            {(
+              <>
+                <div className="mb-6 flex gap-2">
+                  <button type="button" onClick={() => setAddMode('many')} className={['pill', addMode === 'many' ? '' : 'pill-outline'].join(' ')}>
+                    Many loops
+                  </button>
+                  <button type="button" onClick={() => setAddMode('one')} className={['pill', addMode === 'one' ? '' : 'pill-outline'].join(' ')}>
+                    One loop
+                  </button>
+                </div>
+                {addMode === 'many' ? <BulkImport buckets={buckets} onDone={reload} dropped={dropped} /> : <Uploader buckets={buckets} onAdded={onAdded} />}
+              </>
+            )}
+            <div className="mt-6 border-t border-line pt-4">
+              <TidyStorage />
+            </div>
+          </Section>
+        )}
 
       </div>
 

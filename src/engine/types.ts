@@ -19,6 +19,7 @@ export type Loop = {
   bucketId?: string | null
   packId?: string | null
   category?: string | null // subfolder inside the pack
+  favorite?: boolean
 }
 
 export type LoadedLoop = Loop & { buffer: AudioBuffer }

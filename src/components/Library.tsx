@@ -22,8 +22,7 @@ type Props = {
   isActive: (loop: Loop) => boolean
   loadingIds: readonly string[]
   onSelect: (loop: Loop) => void
-  onReplace: (oldId: string, loop: Loop) => void
-  onStop: (loopId: string) => void
+  onFavorite: (loop: Loop) => void
   onRemove: (loop: Loop) => void
   onEdit: (loop: Loop, patch: LoopPatch) => Promise<void>
   onCreateBucket: (name: string) => Promise<void>
@@ -41,7 +40,7 @@ const pill = (active: boolean, extra = '') => ['pill', active ? '' : 'pill-outli
  * sample ledger they apply to.
  */
 export function Library(props: Props) {
-  const { loops, buckets, packs, packFilter, onPackFilter, preset, masterBPM, isActive, loadingIds, onSelect, onReplace, onStop, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
+  const { loops, buckets, packs, packFilter, onPackFilter, preset, masterBPM, isActive, loadingIds, onSelect, onFavorite, onRemove, onEdit, onCreateBucket, onDeleteBucket } = props
   const packById = useMemo(() => new Map(packs.map((p) => [p.id, p])), [packs])
   const extra = (l: Loop) => {
     const p = l.packId ? packById.get(l.packId) : undefined
@@ -288,8 +287,7 @@ export function Library(props: Props) {
               isActive={isActive}
               loadingIds={loadingIds}
               onToggle={onSelect}
-              onReplace={onReplace}
-              onStop={onStop}
+              onFavorite={onFavorite}
               filtering={filtering}
               renderRows={(rows) => (
                 <ul className="grid gap-2 md:block md:gap-0">
@@ -306,6 +304,7 @@ export function Library(props: Props) {
                         onEdit={loop.storagePath ? () => setEditing(editing === loop.id ? null : loop.id) : null}
                         onRemove={() => onRemove(loop)}
                         removeLabel={isActive(loop) ? '×' : 'Del'}
+                        onFavorite={() => onFavorite(loop)}
                       />
                       {editing === loop.id && (
                         <li>

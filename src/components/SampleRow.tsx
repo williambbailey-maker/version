@@ -12,6 +12,7 @@ type Props = {
   onEdit: (() => void) | null
   onRemove: () => void
   removeLabel: string
+  onFavorite?: () => void
 }
 
 export const ROW_COLS = 'grid-cols-[2rem_1fr_4rem_3.5rem_7.5rem_9rem]'
@@ -19,15 +20,32 @@ export const ROW_COLS = 'grid-cols-[2rem_1fr_4rem_3.5rem_7.5rem_9rem]'
 const fmt = (ratio: number) => `${ratio >= 1 ? '+' : '−'}${Math.abs(Math.round((ratio - 1) * 100))}%`
 
 /** One sample: a fixed-height ledger row on desktop, a card on the phone. */
-export function SampleRow({ loop, index, packName, masterBPM, active, loading, onSelect, onEdit, onRemove, removeLabel }: Props) {
+export function SampleRow({ loop, index, packName, masterBPM, active, loading, onSelect, onEdit, onRemove, removeLabel, onFavorite }: Props) {
   const ratio = masterBPM / loop.bpm
   const over = Math.abs(ratio - 1) > 0.2
   const tagCount = loop.tags?.length ?? 0
   const sub = [packName ?? loop.pack, loop.category].filter(Boolean).join(' / ')
   const key = loop.key ? <span className={['chip', active ? 'chip-on' : ''].join(' ')}>{loop.key}</span> : <span className="text-muted">—</span>
 
+  const star = onFavorite ? (
+    <button
+      type="button"
+      aria-pressed={loop.favorite === true}
+      aria-label={loop.favorite ? `Unfavourite ${loop.name}` : `Favourite ${loop.name}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onFavorite()
+      }}
+      className={['grid h-8 w-8 shrink-0 place-items-center text-base leading-none transition-colors duration-150', loop.favorite ? 'text-accent' : active ? 'text-cream/60 hover:text-cream' : 'text-line hover:text-accent'].join(' ')}
+    >
+      {loop.favorite ? '★' : '☆'}
+    </button>
+  ) : null
+
   const actions = (
-    <span className={['flex gap-1.5', active ? 'row-actions-on' : 'row-actions'].join(' ')} onClick={(e) => e.stopPropagation()}>
+    <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      {star}
+      <span className={['flex gap-1.5', active ? 'row-actions-on' : 'row-actions'].join(' ')}>
       {onEdit && (
         <button type="button" aria-label={`Edit ${loop.name}`} onClick={onEdit} className="pill min-h-6 px-2.5 text-[10px]">
           Edit
@@ -36,6 +54,7 @@ export function SampleRow({ loop, index, packName, masterBPM, active, loading, o
       <button type="button" aria-label={`Remove ${loop.name}`} onClick={onRemove} className="pill min-h-6 min-w-11 px-2.5 text-[10px]">
         {removeLabel}
       </button>
+      </span>
     </span>
   )
 

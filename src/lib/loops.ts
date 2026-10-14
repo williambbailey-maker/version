@@ -19,6 +19,7 @@ type LoopRow = {
   bucket_id: string | null
   pack_id: string | null
   category: string | null
+  favorite?: boolean | null
   created_at: string
 }
 
@@ -35,7 +36,7 @@ export type Pack = {
   notes: string | null
 }
 
-const LOOP_COLUMNS = 'id,name,storage_path,original_path,pack,bpm,bars,kind,key,gain,duration,tags,bucket_id,pack_id,category,created_at'
+const LOOP_COLUMNS = 'id,name,storage_path,original_path,pack,bpm,bars,kind,key,gain,duration,tags,bucket_id,pack_id,category,favorite,created_at'
 const PACK_COLUMNS = 'id,name,publisher,description,url,cover_url,genres,notes'
 
 function fromRow(r: LoopRow): Loop {
@@ -54,6 +55,7 @@ function fromRow(r: LoopRow): Loop {
     bucketId: r.bucket_id,
     packId: r.pack_id,
     category: r.category,
+    favorite: r.favorite === true,
   }
 }
 
@@ -160,7 +162,7 @@ export async function deleteBucket(id: string): Promise<void> {
 
 // ---- edits ------------------------------------------------------------------
 
-export type LoopPatch = Partial<Pick<Loop, 'name' | 'tags' | 'bucketId' | 'gain' | 'bpm' | 'bars' | 'kind' | 'packId' | 'category'>>
+export type LoopPatch = Partial<Pick<Loop, 'name' | 'tags' | 'bucketId' | 'gain' | 'bpm' | 'bars' | 'kind' | 'packId' | 'category' | 'favorite'>>
 
 export async function updateLoop(id: string, patch: LoopPatch): Promise<void> {
   const row: Record<string, unknown> = {}
@@ -172,6 +174,7 @@ export async function updateLoop(id: string, patch: LoopPatch): Promise<void> {
   if (patch.bars !== undefined) row.bars = patch.bars
   if (patch.kind !== undefined) row.kind = patch.kind
   if (patch.packId !== undefined) row.pack_id = patch.packId
+  if (patch.favorite !== undefined) row.favorite = patch.favorite
   if (patch.category !== undefined) row.category = patch.category
   const { error } = await supabase.from('loops').update(row).eq('id', id)
   if (error) throw new Error(error.message)
