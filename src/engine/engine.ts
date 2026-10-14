@@ -56,6 +56,8 @@ export class Engine {
   private booster: Booster | null = null // built on first use
   private boost: BoostState = { on: false, preset: DEFAULT_PRESET_ID }
   private samples = new Map<string, Slot>() // keyed by loop id
+  /** Sample loads in flight; a second tap before the load lands cancels it. */
+  private adding = new Set<string>()
   private listeners = new Set<Listener>()
   private loading = new Set<string>()
   private error: string | null = null
@@ -111,8 +113,13 @@ export class Engine {
       throw new RangeError(`Loop "${loop.name}" has ${loop.bars} bars; must be 1, 2, 4 or 8`)
     }
     if (loop.kind === 'drums') return this.selectDrums(loop)
-    if (this.samples.has(loop.id)) this.removeSample(loop.id)
-    else await this.addSample(loop)
+    if (this.samples.has(loop.id)) return this.removeSample(loop.id)
+    if (this.adding.has(loop.id)) {
+      this.adding.delete(loop.id) // tapped again while loading: never add it
+      this.emit()
+      return
+    }
+    await this.addSample(loop)
   }
 
   /**
@@ -342,8 +349,17 @@ export class Engine {
   }
 
   private async addSample(loop: Loop): Promise<void> {
-    const loaded = await this.load(loop)
-    if (this.samples.has(loop.id)) return // toggled twice while loading
+    this.adding.add(loop.id)
+    let loaded: LoadedLoop
+    try {
+      loaded = await this.load(loop)
+    } catch (e) {
+      this.adding.delete(loop.id)
+      throw e
+    }
+    if (!this.adding.has(loop.id)) return // cancelled by a second tap while loading
+    this.adding.delete(loop.id)
+    if (this.samples.has(loop.id)) return // added by another path meanwhile
     const slot = new Slot(this.ctx, 'sample', this.master)
     this.samples.set(loop.id, slot)
     if (this.playing) {

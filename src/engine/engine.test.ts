@@ -165,6 +165,23 @@ describe('Engine', () => {
     expect(engine.isActive('a')).toBe(false)
   })
 
+  it('a second tap while a sample is still loading cancels the add', async () => {
+    const { engine } = make()
+    await engine.select(loop('d', 'drums', 100))
+    // Slow loader: resolve on demand.
+    let release: (() => void) | null = null
+    const orig = engine.loader.load.bind(engine.loader)
+    engine.loader.load = (l) => new Promise((res) => { release = () => res(orig(l)) })
+    const a = loop('a', 'sample', 88)
+    const first = engine.select(a)
+    expect(engine.state.loading).toContain('a')
+    await engine.select(a) // tap again before the file arrives
+    release!()
+    await first
+    expect(engine.state.samples).toEqual([])
+    expect(engine.isActive('a')).toBe(false)
+  })
+
   it('refuses to play with nothing chosen', async () => {
     const { engine } = make()
     await expect(engine.play()).rejects.toThrow(/drum loop or a sample/)

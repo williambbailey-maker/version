@@ -13,6 +13,7 @@ import { SetPassword } from './components/SetPassword'
 import { TidyStorage } from './components/TidyStorage'
 import { Uploader } from './components/Uploader'
 import { ensureRunning, getContext } from './engine/context'
+import { getEngine } from './engine/engine'
 import { useEngine } from './hooks/useEngine'
 import { neighborSample } from './lib/neighbors'
 import { applyTheme, readTheme } from './lib/theme'
@@ -25,7 +26,7 @@ import type { Bucket, LoopPatch, Pack } from './lib/loops'
 import { packStats } from './lib/packs'
 import { DEFAULT_ROOM } from './lib/room'
 import { tagCounts } from './lib/search'
-import { deleteSession, listSessions, resolveStack, saveSession, snapshotStack } from './lib/sessions'
+import { deleteSession, listSessions, resolveStack, saveSession, snapshotStack, updateSessionNotes } from './lib/sessions'
 import type { Session } from './lib/sessions'
 import { supabase } from './lib/supabase'
 import type { Loop } from './engine/types'
@@ -123,6 +124,7 @@ function Studio() {
 
   // ---- favorites
   const favorites = useMemo(() => library.filter((l) => l.kind === 'sample' && l.favorite), [library])
+  const favoriteIds = useMemo(() => new Set(favorites.map((l) => l.id)), [favorites])
   const packNames = useMemo(() => new Map(packs.map((p) => [p.id, p.name])), [packs])
   const onFavorite = (loop: Loop) => {
     const next = !loop.favorite
@@ -216,10 +218,14 @@ function Studio() {
   // ---- sessions
   const clock = engine.drums.loop ?? engine.drums.pending
   const hasStack = !!clock || engine.samples.some((s) => s.loop ?? s.pending)
-  const onSaveSession = async (name: string) => {
-    const s = await saveSession(name, snapshotStack(engine))
+  const onSaveSession = async (name: string, notes: string) => {
+    const s = await saveSession(name, snapshotStack(getEngine().state), notes)
     setSessions((ss) => [s, ...(ss ?? [])])
     setNotice(`Saved "${s.name}".`)
+  }
+  const onSessionNotes = async (s: Session, notes: string) => {
+    await updateSessionNotes(s.id, notes)
+    setSessions((ss) => (ss ? ss.map((x) => (x.id === s.id ? { ...x, notes } : x)) : ss))
   }
   const onLoadSession = (s: Session) => {
     void (async () => {
@@ -341,6 +347,7 @@ function Studio() {
               loops={library}
               canSave={hasStack}
               onSave={onSaveSession}
+              onNotes={onSessionNotes}
               onLoad={onLoadSession}
               onDelete={onDeleteSession}
             />
@@ -380,6 +387,8 @@ function Studio() {
             onSolo={(loop, v) => engine.setSolo(loop.id, v)}
             onSpeed={(loop, v) => engine.setSpeed(loop.id, v)}
             onStep={onStep}
+            favoriteIds={favoriteIds}
+            onFavorite={(loop) => onFavorite(library.find((l) => l.id === loop.id) ?? loop)}
             boost={engine.boost}
             onBoost={engine.setBoost}
             onBoostPreset={engine.setBoostPreset}
