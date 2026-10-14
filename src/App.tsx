@@ -353,10 +353,16 @@ function Studio() {
           sub="drums set the clock, samples follow"
           aside={
             <div className="flex gap-2">
-              {engine.playing && (
+              {engine.playing ? (
                 <button type="button" onClick={onToggle} className="pill pill-accent">
                   Stop
                 </button>
+              ) : (
+                hasStack && (
+                  <button type="button" onClick={onToggle} className="pill">
+                    Play
+                  </button>
+                )
               )}
               <button type="button" onClick={openSessions} disabled={!hasStack} className="pill pill-outline">
                 Save stack
