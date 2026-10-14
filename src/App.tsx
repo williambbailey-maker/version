@@ -188,8 +188,7 @@ function Studio() {
   }
 
   const onPackFilter = (id: string | null) => {
-    setPackFilter(id)
-    if (id) jump('library')
+    setPackFilter(id) // the browser scrolls its group list into view when this changes
   }
 
   const onCreateBucket = async (name: string) => {

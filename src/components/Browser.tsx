@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Loop } from '../engine/types'
 import { byBpm, groupPack, packList, stemLabel, stripPrefix } from '../lib/groups'
@@ -39,6 +39,16 @@ export function Browser(props: Props) {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [details, setDetails] = useState(false)
   const [pane, setPane] = useState<'packs' | 'groups'>(selected ? 'groups' : 'packs')
+  const groupPaneRef = useRef<HTMLDivElement>(null)
+
+  // Choosing a pack (left pane, shelf or lamp) brings the group list into view.
+  const prevSelected = useRef(selected)
+  useEffect(() => {
+    if (prevSelected.current === selected) return
+    prevSelected.current = selected
+    if (!selected) return
+    requestAnimationFrame(() => groupPaneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }, [selected])
 
   // A lone group (after filtering) opens itself; a pack change closes whatever was open.
   useEffect(() => {
@@ -146,7 +156,7 @@ export function Browser(props: Props) {
   )
 
   const groupPane = data ? (
-    <div className="flex min-w-0 flex-col">
+    <div ref={groupPaneRef} className="flex min-w-0 scroll-mt-4 flex-col">
       <div className="flex items-baseline justify-between gap-3 border-b border-ink pb-2">
         <div className="flex min-w-0 items-baseline gap-3">
           <button type="button" onClick={() => setPane('packs')} className="pill pill-outline min-h-8 px-3 md:hidden" aria-label="Back to packs">
