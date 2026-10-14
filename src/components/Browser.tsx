@@ -14,8 +14,7 @@ type Props = {
   isActive: (loop: Loop) => boolean
   loadingIds: readonly string[]
   onToggle: (loop: Loop) => void
-  onReplace: (oldId: string, loop: Loop) => void
-  onStop: (loopId: string) => void
+  onFavorite: (loop: Loop) => void
   /** The ledger rows (edit, delete, stretch meter) for a group's loops. */
   renderRows: (loops: Loop[]) => ReactNode
   /** True while any search/filter narrows the list: hide empty packs, auto-expand a lone group. */
@@ -32,7 +31,7 @@ const fmt = (ratio: number) => `${ratio >= 1 ? '+' : '−'}${Math.abs(Math.round
  * of toggles. Kits layer, folders audition one loop at a time.
  */
 export function Browser(props: Props) {
-  const { samples, packNames, selected, onSelectPack, masterBPM, isActive, loadingIds, onToggle, onReplace, onStop, renderRows, filtering } = props
+  const { samples, packNames, selected, onSelectPack, masterBPM, isActive, loadingIds, onToggle, onFavorite, renderRows, filtering } = props
   const packs = useMemo(() => packList(samples, packNames), [samples, packNames])
   const current = useMemo(() => packs.find((p) => p.key === selected) ?? packs[0] ?? null, [packs, selected])
   const data = useMemo(() => (current ? groupPack(samples, current) : null), [samples, current])
@@ -57,51 +56,48 @@ export function Browser(props: Props) {
   }
 
   const open = (group: Group) => {
-    if (expanded === group.key) {
-      setExpanded(null)
-      return
-    }
-    // Opening a different kit stops the previous kit's stems.
-    const prev = data?.groups.find((g) => g.key === expanded)
-    if (prev && prev.kind === 'kit') for (const l of prev.loops) if (isActive(l)) onStop(l.id)
-    setExpanded(group.key)
+    setExpanded(expanded === group.key ? null : group.key)
     setDetails(false)
   }
 
-  const tap = (group: Group, loop: Loop) => {
-    if (group.kind === 'kit' || isActive(loop)) {
-      onToggle(loop)
-      return
-    }
-    const playing = group.loops.find((l) => isActive(l))
-    if (playing) onReplace(playing.id, loop)
-    else onToggle(loop)
-  }
+  /** Every tap adds (or removes) that loop; ‹ › in the mixer is the way to swap. */
+  const tap = (_group: Group, loop: Loop) => onToggle(loop)
 
   const stem = (group: Group, loop: Loop) => {
     const on = isActive(loop)
     const loading = loadingIds.includes(loop.id)
     const label = group.kind === 'kit' ? stemLabel(loop.name, group.name) : stripPrefix(loop.name)
     const ratio = masterBPM / loop.bpm
+    const fav = loop.favorite === true
     return (
-      <button
-        key={loop.id}
-        type="button"
-        aria-pressed={on}
-        onClick={() => tap(group, loop)}
-        title={loop.name}
-        className={[
-          'flex min-h-11 min-w-0 flex-col items-start justify-center gap-0.5 border-[1.5px] px-3 py-2 text-left transition-colors duration-150',
-          on ? 'border-ink bg-ink text-cream' : 'border-line hover:border-ink',
-          loading ? 'opacity-60' : '',
-        ].join(' ')}
-      >
-        <span className="w-full truncate text-sm font-bold">{label}</span>
-        <span className={['mono-label', on ? 'text-cream/80' : 'text-muted'].join(' ')}>
-          {group.kind === 'folder' ? `${loop.bpm}${loop.key ? ` · ${loop.key}` : ''} · ` : ''}
-          {fmt(ratio)}
-        </span>
-      </button>
+      <div key={loop.id} className="relative min-w-0">
+        <button
+          type="button"
+          aria-pressed={on}
+          onClick={() => tap(group, loop)}
+          title={loop.name}
+          className={[
+            'flex min-h-11 w-full min-w-0 flex-col items-start justify-center gap-0.5 border-[1.5px] py-2 pl-3 pr-9 text-left transition-colors duration-150',
+            on ? 'border-ink bg-ink text-cream' : 'border-line hover:border-ink',
+            loading ? 'opacity-60' : '',
+          ].join(' ')}
+        >
+          <span className="w-full truncate text-sm font-bold">{label}</span>
+          <span className={['mono-label', on ? 'text-cream/80' : 'text-muted'].join(' ')}>
+            {group.kind === 'folder' ? `${loop.bpm}${loop.key ? ` · ${loop.key}` : ''} · ` : ''}
+            {fmt(ratio)}
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={fav}
+          aria-label={fav ? `Unfavourite ${loop.name}` : `Favourite ${loop.name}`}
+          onClick={() => onFavorite(loop)}
+          className={['absolute right-1 top-1 grid h-8 w-8 place-items-center text-base leading-none transition-colors duration-150', fav ? 'text-accent' : on ? 'text-cream/50 hover:text-cream' : 'text-line hover:text-accent'].join(' ')}
+        >
+          {fav ? '★' : '☆'}
+        </button>
+      </div>
     )
   }
 
@@ -192,7 +188,7 @@ export function Browser(props: Props) {
                 <div className="px-2 pb-4">
                   <div className="flex items-center justify-between gap-3">
                     <span className="mono-label text-muted">
-                      {g.kind === 'kit' ? 'Stems layer: tap several.' : 'One at a time: tapping swaps the one playing.'}
+                      {g.kind === 'kit' ? 'Stems layer: tap several.' : 'Tap to add, tap again to take out.'}
                     </span>
                     <button type="button" onClick={() => setDetails((v) => !v)} aria-pressed={details} className="pill pill-outline min-h-8 px-3">
                       {details ? 'Grid' : 'Details'}

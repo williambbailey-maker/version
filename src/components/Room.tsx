@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Pack } from '../lib/loops'
 import type { PackStats } from '../lib/packs'
 import { dragHasFiles, readDrop } from '../lib/drop'
 import type { DroppedFile } from '../lib/drop'
 import type { RoomMap, RoomObject } from '../lib/room'
+import { layoutSpines, spineLabel, spineLabelSize } from '../lib/shelf'
 
 type Props = {
   playing: boolean
@@ -13,7 +14,10 @@ type Props = {
   packStats: Map<string, PackStats>
   sessionsCount: number
   roomMap: RoomMap
-  onPlayToggle: () => void
+  /** Pack key currently open in the library; its record stays pulled out. */
+  selectedPack: string | null
+  favoritesCount: number
+  onFavorites: () => void
   onSessions: () => void
   onAdd: () => void
   onDropFiles: (files: DroppedFile[]) => void
@@ -21,7 +25,6 @@ type Props = {
   onPack: (id: string) => void
 }
 
-const PER_SHELF = 6
 
 /**
  * The studio: a monoline room whose objects are the navigation.
@@ -30,9 +33,8 @@ const PER_SHELF = 6
  * between rooms; phones stack them.
  */
 export function Room(props: Props) {
-  const { playing, masterBPM, tagCounts, packs, packStats, sessionsCount, roomMap, onPlayToggle, onSessions, onAdd, onDropFiles, onTag, onPack } = props
+  const { playing, tagCounts, packs, packStats, sessionsCount, roomMap, selectedPack, favoritesCount, onFavorites, onSessions, onAdd, onDropFiles, onTag, onPack } = props
   const [room, setRoom] = useState(0)
-  const [page, setPage] = useState(0)
   const [basketOver, setBasketOver] = useState(false)
   const [now, setNow] = useState(() => new Date())
 
@@ -43,8 +45,11 @@ export function Room(props: Props) {
 
   const count = (tag: string) => tagCounts.get(tag) ?? 0
   const tipFor = (obj: RoomObject) => `#${roomMap[obj].toUpperCase()} · ${count(roomMap[obj])}`
-  const pages = Math.max(1, Math.ceil(packs.length / PER_SHELF))
-  const shelfPacks = packs.slice(page * PER_SHELF, page * PER_SHELF + PER_SHELF)
+  // Record spines: every pack on one shelf, width by loop count.
+  const spines = useMemo(
+    () => layoutSpines(packs.map((p) => ({ id: p.id, name: p.name, count: packStats.get(p.id)?.samples ?? 0 })), 150, 800),
+    [packs, packStats],
+  )
   const randomPack = () => {
     if (packs.length === 0) return
     onPack(packs[Math.floor(Math.random() * packs.length)]!.id)
@@ -136,7 +141,7 @@ export function Room(props: Props) {
       <path className="w" d="M884 300l-5-34h54l-5 34z" />
 
       {/* turntable → play/stop */}
-      <g {...hotProps(playing ? 'Turntable: stop' : 'Turntable: play', onPlayToggle)}>
+      <g {...hotProps(`Turntable: favourites (${favoritesCount})`, onFavorites)}>
         <rect className="w" x="380" y="216" width="180" height="84" rx="6" />
         <g className="platter">
           <circle className="w" cx="470" cy="262" r="34" />
@@ -154,7 +159,7 @@ export function Room(props: Props) {
         <circle className="l" cx="540" cy="288" r="4" />
         <g className="tip">
           <rect x="410" y="190" width="120" height="20" rx="10" />
-          <text x="470" y="204" textAnchor="middle">{playing ? 'STOP' : `PLAY · ${masterBPM} BPM`}</text>
+          <text x="470" y="204" textAnchor="middle">FAVOURITES · {favoritesCount}</text>
         </g>
       </g>
 
@@ -271,20 +276,25 @@ export function Room(props: Props) {
     </svg>
   )
 
-  const tape = (p: Pack, x: number, y: number) => {
-    const s = packStats.get(p.id)
-    const label = p.name.length > 30 ? p.name.slice(0, 29) + '…' : p.name
+  const SHELF_Y = 330
+  const spine = (sp: (typeof spines)[number]) => {
+    const on = selectedPack === sp.id
+    const size = spineLabelSize(sp.w)
+    const y = SHELF_Y - sp.h
+    const tipW = Math.min(300, 60 + (sp.name.length + 10) * 6.6)
+    const tipX = Math.max(40, Math.min(960 - tipW, sp.x + sp.w / 2 - tipW / 2))
     return (
-      <g key={p.id} {...hotProps(`Pack: ${p.name}`, () => onPack(p.id))}>
-        <rect className="w" x={x} y={y} width="250" height="76" rx="5" />
-        <circle className="l" cx={x + 85} cy={y + 46} r="11" />
-        <circle className="l" cx={x + 165} cy={y + 46} r="11" />
-        <path className="l" d={`M${x + 96} ${y + 46}h58`} />
-        <text x={x + 125} y={y + 22} textAnchor="middle" fontSize="10.5">{label.toUpperCase()}</text>
+      <g key={sp.id} {...hotProps(`Pack: ${sp.name} (${sp.count} loops)`, () => onPack(sp.id))} className={['hot spine', on ? 'on' : ''].join(' ')}>
+        <rect className="w" x={sp.x} y={y} width={sp.w} height={sp.h} rx="2" />
+        {size !== null && (
+          <text transform={`translate(${sp.x + sp.w / 2 + size * 0.35} ${SHELF_Y - 10}) rotate(-90)`} fontSize={size}>
+            {spineLabel(sp.name, sp.h, size)}
+          </text>
+        )}
         <g className="tip">
-          <rect x={x + 55} y={y - 28} width="140" height="20" rx="10" />
-          <text x={x + 125} y={y - 14} textAnchor="middle">
-            {s ? `${s.count} LOOPS${s.bpmMin !== null ? ` · ${s.bpmMin}–${s.bpmMax}` : ''}` : 'PACK'}
+          <rect x={tipX} y={y - 50} width={tipW} height="20" rx="10" />
+          <text x={tipX + tipW / 2} y={y - 36} textAnchor="middle">
+            {sp.name.toUpperCase()} · {sp.count} LOOP{sp.count === 1 ? '' : 'S'}
           </text>
         </g>
       </g>
@@ -293,31 +303,26 @@ export function Room(props: Props) {
 
   const shelf = (
     <svg className="scene block h-auto w-full" viewBox="0 0 1000 420" role="group" aria-label="The shelf">
-      <path className="l" d="M40 190h920M40 320h920M40 400h920" />
-      {shelfPacks.slice(0, 3).map((p, i) => tape(p, 60 + i * 270, 112))}
-      {shelfPacks.slice(3, 6).map((p, i) => tape(p, 60 + i * 270, 242))}
+      <path className="l" d={`M40 ${SHELF_Y}h920`} />
+      {spines.map(spine)}
       {packs.length === 0 && (
-        <text x="500" y="160" textAnchor="middle" fontSize="11" fill="var(--color-muted)">
-          THE SHELF IS EMPTY. IMPORT A FOLDER AND IT FILLS UP.
+        <text x="500" y="200" textAnchor="middle" fontSize="11" fill="var(--color-muted)">
+          THE SHELF IS EMPTY. DROP A FOLDER ON THE BASKET AND IT FILLS UP.
         </text>
       )}
-      {pages > 1 && (
-        <g {...hotProps(`Next shelf (${page + 1} of ${pages})`, () => setPage((page + 1) % pages))}>
-          <rect className="w" x="880" y="336" width="72" height="56" rx="4" />
-          <path className="l" d="M900 364h30M922 356l8 8-8 8" />
-          <text x="916" y="352" textAnchor="middle" fontSize="9">{page + 1}/{pages}</text>
-        </g>
-      )}
+      <text x="150" y="366" fontSize="10" fill="var(--color-muted)">
+        {packs.length} PACK{packs.length === 1 ? '' : 'S'} · THICK ONES HOLD MORE · TAP ONE TO OPEN IT
+      </text>
       {/* lamp → random pack */}
       <g {...hotProps('Lamp: open a pack at random', randomPack)}>
-        <rect x="866" y="70" width="90" height="120" fill="transparent" />
-        <path className="w" d="M912 98c-22 0-38 14-38 34h76c0-20-16-34-38-34z" />
-        <path className="l" d="M912 132v46M892 178h40" />
-        <path className="l" d="M912 178v12" />
-        <circle className="f" cx="912" cy="136" r="3" />
+        <rect x="40" y="200" width="100" height="130" fill="transparent" />
+        <path className="w" d="M86 228c-22 0-38 14-38 34h76c0-20-16-34-38-34z" />
+        <path className="l" d="M86 262v56M66 318h40" />
+        <path className="l" d="M86 318v12" />
+        <circle className="f" cx="86" cy="266" r="3" />
         <g className="tip">
-          <rect x="832" y="64" width="160" height="20" rx="10" />
-          <text x="912" y="78" textAnchor="middle">SURPRISE ME</text>
+          <rect x="40" y="194" width="130" height="20" rx="10" />
+          <text x="105" y="208" textAnchor="middle">SURPRISE ME</text>
         </g>
       </g>
     </svg>
@@ -422,7 +427,7 @@ function RoomNav({ room, onRoom, onSessions }: { room: number; onRoom: (r: numbe
       {info && (
         <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom,0px))] z-20 mx-auto w-[min(420px,calc(100%-32px))] rounded-2xl border-[1.5px] border-ink bg-cream p-4 text-xs leading-relaxed">
           <p className="caption mb-2">How the studio works</p>
-          <p>Hover anything and it tells you what it holds. The turntable plays and stops. Headphones open your saved sessions. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. Swipe sideways to reach the shelf. The shelf is your packs; the lamp opens one at random. The basket under the desk adds loops.</p>
+          <p>Hover anything and it tells you what it holds. The turntable holds your starred samples. Headphones open your saved sessions. Tap any loop and it plays straight away. Instruments open loops with a tag, sorted by how far they stretch to sit on your drums. Swipe sideways to reach the shelf. The shelf is your packs; the lamp opens one at random. The basket under the desk adds loops.</p>
           <button type="button" onClick={() => setInfo(false)} className="pill pill-outline mt-3">Close</button>
         </div>
       )}
