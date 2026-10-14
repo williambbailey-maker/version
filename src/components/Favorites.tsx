@@ -2,7 +2,7 @@ import type { Loop } from '../engine/types'
 import { SampleRow } from './SampleRow'
 
 type Props = {
-  loops: Loop[] // favourited samples
+  loops: Loop[] // favorited samples
   packNames: ReadonlyMap<string, string>
   masterBPM: number
   isActive: (loop: Loop) => boolean
