@@ -21,13 +21,15 @@ type Props = {
   onSpeed: (loop: Loop, speed: 1 | 2) => void
   /** Step this column to the previous/next sample in its pack. */
   onStep: (loop: Loop, dir: 1 | -1) => void
+  favoriteIds: ReadonlySet<string>
+  onFavorite: (loop: Loop) => void
   boost: BoostState
   onBoost: (on: boolean) => void
   onBoostPreset: (id: string) => void
 }
 
 /** What's playing (or queued): one stripe column each. */
-export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, onStep, boost, onBoost, onBoostPreset }: Props) {
+export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, onStep, favoriteIds, onFavorite, boost, onBoost, onBoostPreset }: Props) {
   const cols: { slot: SlotState; loop: Loop; removable: boolean }[] = []
   const d = drums.loop ?? drums.pending
   if (d) cols.push({ slot: drums, loop: d, removable: false })
@@ -72,6 +74,18 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
               >
                 S
               </button>
+              {loop.kind === 'sample' && (
+                <button
+                  type="button"
+                  aria-pressed={favoriteIds.has(loop.id)}
+                  aria-label={favoriteIds.has(loop.id) ? `Unfavorite ${loop.name}` : `Favorite ${loop.name}`}
+                  title="Favorite"
+                  onClick={() => onFavorite(loop)}
+                  className={['pill min-h-7 flex-1 px-2', favoriteIds.has(loop.id) ? 'pill-accent' : 'pill-outline'].join(' ')}
+                >
+                  {favoriteIds.has(loop.id) ? '★' : '☆'}
+                </button>
+              )}
               {loop.kind === 'drums' && (
                 <button
                   type="button"

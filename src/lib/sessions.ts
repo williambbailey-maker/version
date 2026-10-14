@@ -10,10 +10,11 @@ export type Session = {
   drumsLoopId: string | null
   samples: SessionSample[]
   boost: BoostState | null
+  notes: string
   updatedAt: string
 }
 
-type Row = { id: string; name: string; drums_loop_id: string | null; samples: unknown; boost: unknown; updated_at: string }
+type Row = { id: string; name: string; drums_loop_id: string | null; samples: unknown; boost: unknown; notes?: string | null; updated_at: string }
 
 function boostFrom(raw: unknown): BoostState | null {
   if (!raw || typeof raw !== 'object') return null
@@ -37,6 +38,7 @@ function fromRow(r: Row): Session {
         speed: s.speed === 2 ? 2 : 1,
       })),
     boost: boostFrom(r.boost),
+    notes: typeof r.notes === 'string' ? r.notes : '',
     updatedAt: r.updated_at,
   }
 }
@@ -76,23 +78,35 @@ export function resolveStack(session: Session, loops: readonly Loop[]): {
 }
 
 export async function listSessions(): Promise<Session[]> {
-  const { data, error } = await supabase.from('sessions').select('id,name,drums_loop_id,samples,boost,updated_at').order('updated_at', { ascending: false })
+  const { data, error } = await supabase.from('sessions').select('id,name,drums_loop_id,samples,boost,notes,updated_at').order('updated_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data as Row[]).map(fromRow)
 }
 
-export async function saveSession(name: string, stack: { drumsLoopId: string | null; samples: SessionSample[]; boost?: BoostState | null }, id?: string): Promise<Session> {
+export async function saveSession(
+  name: string,
+  stack: { drumsLoopId: string | null; samples: SessionSample[]; boost?: BoostState | null },
+  notes = '',
+  id?: string,
+): Promise<Session> {
   const row = {
     name: name.trim(),
     drums_loop_id: stack.drumsLoopId,
     samples: stack.samples.map((s) => ({ loop_id: s.loopId, gain: s.gain, muted: s.muted, solo: s.solo, speed: s.speed })),
     boost: stack.boost ?? null,
+    notes,
     updated_at: new Date().toISOString(),
   }
   const q = id ? supabase.from('sessions').update(row).eq('id', id) : supabase.from('sessions').insert(row)
-  const { data, error } = await q.select('id,name,drums_loop_id,samples,boost,updated_at').single()
+  const { data, error } = await q.select('id,name,drums_loop_id,samples,boost,notes,updated_at').single()
   if (error) throw new Error(error.message)
   return fromRow(data as Row)
+}
+
+/** Notes travel with the session; editing them does not touch the stack. */
+export async function updateSessionNotes(id: string, notes: string): Promise<void> {
+  const { error } = await supabase.from('sessions').update({ notes }).eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 export async function deleteSession(id: string): Promise<void> {
