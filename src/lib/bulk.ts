@@ -30,6 +30,8 @@ export type BulkOptions = {
   tags: string[]
   kind: LoopKind | 'auto'
   originals: boolean // upload the file as-is instead of an MP3 preview
+  /** Trust the item's own bpm/bars (set by the caller) over detection. */
+  keepBpm?: boolean
   /** 'one': everything goes into `packName` (sub-folders become categories). 'folders': first folder = pack. */
   packMode: 'one' | 'folders'
   packName: string | null
@@ -145,7 +147,9 @@ export async function runBulkImport(
       item.key = keyFromFilename(item.file.name)
       item.kind = opts.kind !== 'auto' ? opts.kind : autoKind(item.relPath, item.pack)
       item.source = est.source
-      if (est.bpm === null) {
+      if (opts.keepBpm && item.bpm !== null) {
+        item.bars = guessBars(est.buffer.duration, item.bpm)
+      } else if (est.bpm === null) {
         if (item.bpm === null) {
           item.status = 'notempo'
           update(item)
