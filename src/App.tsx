@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BulkImport } from './components/BulkImport'
 import { Favorites } from './components/Favorites'
+import { Retempo } from './components/Retempo'
 import type { Drop } from './components/BulkImport'
 import { Library } from './components/Library'
 import type { LibraryPreset } from './components/Library'
@@ -64,6 +65,11 @@ function Studio() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [showUploader, setShowUploader] = useState(false)
+  const [showRetempo, setShowRetempo] = useState(false)
+  const openRetempo = () => {
+    setShowRetempo(true)
+    setTimeout(() => jump('retempo'), 30)
+  }
   const [theme, setTheme] = useState<Theme>(() => readTheme())
   const toggleTheme = () => {
     const next: Theme = theme === 'dark' ? 'light' : 'dark'
@@ -291,6 +297,7 @@ function Studio() {
           onSessions={openSessions}
           onAdd={() => { setShowUploader(true); setTimeout(() => jump('add'), 30) }}
           onDropFiles={onDropFiles}
+          onRetempo={openRetempo}
           onTag={openTag}
           onPack={onPackFilter}
         />
@@ -440,11 +447,30 @@ function Studio() {
                   </button>
                 </div>
                 {addMode === 'many' ? <BulkImport buckets={buckets} onDone={reload} dropped={dropped} /> : <Uploader buckets={buckets} onAdded={onAdded} />}
+              <p className="mono-label mt-6 text-muted">
+                Want to change a loop's tempo and download it?{' '}
+                <button type="button" onClick={openRetempo} className="underline underline-offset-4 hover:text-accent">
+                  Open Re-tempo
+                </button>
+              </p>
               </>
             )}
             <div className="mt-6 border-t border-line pt-4">
               <TidyStorage />
             </div>
+          </Section>
+        )}
+        {showRetempo && (
+          <Section
+            id="retempo"
+            label="Re-tempo"
+            aside={
+              <button type="button" onClick={() => setShowRetempo(false)} className="pill pill-outline">
+                Hide
+              </button>
+            }
+          >
+            <Retempo masterBPM={engine.masterBPM} onUploaded={reload} />
           </Section>
         )}
 

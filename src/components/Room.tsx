@@ -21,6 +21,7 @@ type Props = {
   onSessions: () => void
   onAdd: () => void
   onDropFiles: (files: DroppedFile[]) => void
+  onRetempo: () => void
   onTag: (tag: string) => void
   onPack: (id: string) => void
 }
@@ -33,7 +34,7 @@ type Props = {
  * between rooms; phones stack them.
  */
 export function Room(props: Props) {
-  const { playing, tagCounts, packs, packStats, sessionsCount, roomMap, selectedPack, favoritesCount, onFavorites, onSessions, onAdd, onDropFiles, onTag, onPack } = props
+  const { playing, tagCounts, packs, packStats, sessionsCount, roomMap, selectedPack, favoritesCount, onFavorites, onSessions, onAdd, onDropFiles, onRetempo, onTag, onPack } = props
   const [room, setRoom] = useState(0)
   const [basketOver, setBasketOver] = useState(false)
   const [now, setNow] = useState(() => new Date())
@@ -411,14 +412,14 @@ export function Room(props: Props) {
       </div>
       {/* phone only: the small nav pill. Desktop swipes between rooms instead. */}
       <div className="md:hidden">
-        <RoomNav room={room} onRoom={goRoom} onSessions={onSessions} />
+        <RoomNav room={room} onRoom={goRoom} onSessions={onSessions} onRetempo={onRetempo} />
       </div>
     </div>
   )
 }
 
 /** The small dark pill at the bottom: info, menu, previous, next. */
-function RoomNav({ room, onRoom, onSessions }: { room: number; onRoom: (r: number) => void; onSessions: () => void }) {
+function RoomNav({ room, onRoom, onSessions, onRetempo }: { room: number; onRoom: (r: number) => void; onSessions: () => void; onRetempo: () => void }) {
   const [menu, setMenu] = useState(false)
   const [info, setInfo] = useState(false)
   const jump = (id: string) => {
@@ -437,9 +438,10 @@ function RoomNav({ room, onRoom, onSessions }: { room: number; onRoom: (r: numbe
               ['mix', 'Mix'],
               ['library', 'Library'],
               ['add', 'Add loops'],
+              ['retempo', 'Re-tempo'],
             ] as const
           ).map(([id, label]) => (
-            <button key={id} type="button" onClick={() => { if (id === 'sessions') { setMenu(false); onSessions() } else jump(id) }} className="pill pill-outline">
+            <button key={id} type="button" onClick={() => { if (id === 'sessions') { setMenu(false); onSessions() } else if (id === 'retempo') { setMenu(false); onRetempo() } else jump(id) }} className="pill pill-outline">
               {label}
             </button>
           ))}
