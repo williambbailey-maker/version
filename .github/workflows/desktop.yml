@@ -1,0 +1,84 @@
+# Builds the Loop Lab Mac app (a native window around looplab.dunwell.co).
+#
+# The app loads the live site, so ordinary web changes never need a new
+# build. This only runs when the native shell in src-tauri/ changes, or when
+# started by hand from the Actions tab. On main it publishes the .dmg to the
+# "Loop Lab desktop" release; on a pull request it only builds and checks.
+name: Desktop app
+
+on:
+  push:
+    branches: [main]
+    paths: ['src-tauri/**', '.github/workflows/desktop.yml']
+  pull_request:
+    paths: ['src-tauri/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Unit tests (native shell)
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --target universal-apple-darwin
+          tagName: ${{ github.event_name != 'pull_request' && 'desktop-v__VERSION__' || '' }}
+          releaseName: Loop Lab desktop v__VERSION__
+          releaseBody: |
+            Download the .dmg below, open it, and drag Loop Lab into Applications.
+
+            The first time you open it, macOS will say it cannot verify the app. Open System Settings, go to Privacy & Security, scroll down, and click "Open Anyway". You only do this once.
+          releaseDraft: false
+          prerelease: false
+
+      - name: Check the built app
+        run: |
+          APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/Loop Lab.app"
+          BIN="$APP/Contents/MacOS/$(ls "$APP/Contents/MacOS" | head -1)"
+          echo "binary: $BIN"
+          lipo -archs "$BIN"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          ls -lh src-tauri/target/universal-apple-darwin/release/bundle/dmg/
+          # Launch it and make sure it is still running after 20 seconds.
+          "$BIN" & PID=$!
+          sleep 20
+          screencapture -x desktop-smoke.png || true
+          kill -0 $PID
+          kill $PID
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: loop-lab-mac
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            desktop-smoke.png
+          if-no-files-found: warn
