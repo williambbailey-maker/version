@@ -40,6 +40,9 @@ export type EngineState = {
   error: string | null
 }
 
+/** A bar grid: where bar 0 started, how long a bar is, and when it stopped (null while running). */
+export type Grid = { start: number; barSec: number; bpm: number; end: number | null }
+
 type Listener = () => void
 
 /** Top of the master fader: twice unity (about +6 dB). Halfway is unchanged. */
@@ -73,6 +76,8 @@ export class Engine {
   private masterLevel = 1
   /** Scheduled stop boundary, if a bar-quantized stop is in flight. */
   private stopAt: number | null = null
+  /** The grid that ran until the last stop, so what was just played can still be placed on it. */
+  private lastGrid: Grid | null = null
   /** The drum loop still being fetched/decoded, so play() can wait for it. */
   private drumsLoading: Promise<unknown> | null = null
   private _state: EngineState
@@ -101,6 +106,13 @@ export class Engine {
 
   get playing(): boolean {
     return this.transport.running
+  }
+
+  /** The running bar grid, or the one that ran until the last stop. Null before the first play. */
+  grid(): Grid | null {
+    const start = this.transport.transportStart
+    if (start !== null) return { start, barSec: this.transport.barSec, bpm: this.transport.masterBPM, end: null }
+    return this.lastGrid
   }
 
   /** Zero-based bar index since play(), -1 when stopped. */
@@ -310,6 +322,7 @@ export class Engine {
     if (!this.playing) return
     const at = this.transport.nextBar(this.ctx.currentTime, SWAP_MIN_LEAD)
     this.stopAt = at
+    this.lastGrid = { start: this.transport.transportStart ?? at, barSec: this.transport.barSec, bpm: this.transport.masterBPM, end: at }
     this.drums.stop(at)
     for (const slot of this.samples.values()) slot.stop(at)
     this.transport.stop()

@@ -30,11 +30,15 @@ type Props = {
   isActive: (loopId: string) => boolean
   /** Toggle a take in or out of the mix (bar-quantized, like tapping a sample). */
   onAudition: (loop: Loop) => void
+  /** The app points this at the panel's grab action, so the G key can trigger it. */
+  grabRef: { current: (() => void) | null }
   /** A take was saved to the library as `saved`; `temp` was its in-memory stand-in. The app adds `saved` to the mix. */
   onKept: (temp: Loop, saved: Loop) => void
 }
 
 const PACK = 'Takes'
+/** How many bars the Grab button keeps. */
+export const GRAB_BARS = 8
 const LENGTHS: { value: TakeLength; label: string }[] = [
   { value: 1, label: '1 bar' },
   { value: 2, label: '2 bars' },
@@ -45,7 +49,7 @@ const LENGTHS: { value: TakeLength; label: string }[] = [
 
 const ms = (sec: number) => `${(sec * 1000).toFixed(1)} ms`
 
-export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, isActive, onAudition, onKept }: Props) {
+export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, isActive, onAudition, onKept, grabRef }: Props) {
   const rec = useRecorder()
   const [length, setLength] = useState<TakeLength>(4)
   const [mode, setMode] = useState<ChannelMode>('in1')
@@ -61,22 +65,44 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
     if (mono && mode !== 'in1') setMode('in1')
   }, [mono, mode])
 
+  /** Put a finished recording at the top of the list. `loops` is false for free takes, which cannot loop in the mix. */
+  const addTake = (r: RecordedTake, loops: boolean) => {
+    const made = new Date()
+    const name = takeName(made, nextTakeNumber([...libraryNames, ...takesRef.current.map((t) => t.name)], made))
+    const id = `take-${crypto.randomUUID()}`
+    const loop: Loop | null = loops ? { id, name, url: '', bpm: r.bpm, bars: r.bars as Bars, kind: 'sample', gain: DEFAULT_SAMPLE_GAIN, buffer: rec.toBuffer(r), tags: ['take'], pack: PACK } : null
+    setTakes((ts) => [{ ...r, id, name, mode, loop, status: 'new' }, ...ts])
+    return name
+  }
+
   const onRecord = async () => {
     setMessage(null)
     try {
-      const r = await rec.record(length, mode)
-      const made = new Date()
-      const name = takeName(made, nextTakeNumber([...libraryNames, ...takesRef.current.map((t) => t.name)], made))
-      const id = `take-${crypto.randomUUID()}`
       // Fixed lengths start on a phrase boundary, so they can loop in the mix; free takes cannot.
-      const loop: Loop | null =
-        length !== 'free' ? { id, name, url: '', bpm: r.bpm, bars: r.bars as Bars, kind: 'sample', gain: DEFAULT_SAMPLE_GAIN, buffer: rec.toBuffer(r), tags: ['take'], pack: PACK } : null
-      setTakes((ts) => [{ ...r, id, name, mode, loop, status: 'new' }, ...ts])
+      addTake(await rec.record(length, mode), length !== 'free')
     } catch (e) {
       const text = e instanceof Error ? e.message : String(e)
       if (text !== 'Take cancelled.') setMessage(text)
     }
   }
+
+  /** Keep the bars that were just played, with nothing armed beforehand. */
+  const onGrab = async () => {
+    try {
+      const name = addTake(await rec.grab(GRAB_BARS, mode), true)
+      setMessage(`Grabbed the last ${GRAB_BARS} bars as "${name}".`)
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e))
+    }
+  }
+  const grabNow = useRef(onGrab)
+  grabNow.current = onGrab
+  useEffect(() => {
+    grabRef.current = () => void grabNow.current()
+    return () => {
+      grabRef.current = null
+    }
+  }, [grabRef])
 
   const onCalibrate = async () => {
     setMessage(null)
@@ -172,10 +198,22 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
                 </button>
               </>
             )}
+            {!busy && (
+              <button type="button" onClick={() => void onGrab()} disabled={rec.status !== 'ready'} className="pill min-h-11 px-6 text-[13px]" title="Keep the 8 bars you just played (G)">
+                Grab last {GRAB_BARS} bars
+                <span className="chip ml-2 border-current" aria-hidden="true">
+                  G
+                </span>
+              </button>
+            )}
             <Progress status={rec.status} startsAt={rec.startsAt} endsAt={rec.endsAt} barSec={rec.barSec} bars={rec.bars} now={rec.now} />
             {!busy && !hasStack && <span className="mono-label text-muted">Tap a drum loop or a sample first: it sets the tempo.</span>}
             {!busy && hasStack && !playing && <span className="mono-label text-muted">Playback starts with the take; you hear {length === 'free' ? 'one bar' : 'the phrase once'} before recording begins.</span>}
           </div>
+
+          <p className="mono-label max-w-2xl normal-case leading-relaxed text-muted">
+            Jamming? Loop Lab is always listening while the input is connected. Press G, or the Grab button, to keep the {GRAB_BARS} bars before the last bar line. It works after you stop too, for about a minute.
+          </p>
 
           <div className="flex flex-col gap-2 border-t border-line pt-4">
             <div className="flex flex-wrap items-center gap-2">

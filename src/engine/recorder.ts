@@ -9,7 +9,7 @@
  *
  * Pure TypeScript, no React. The bar and latency maths live in capture.ts.
  */
-import { captureStartFrame, covers, measureLatency, peakOf, phraseStart, sliceBlocks, takeFrames } from './capture'
+import { captureStartFrame, covers, lastBars, measureLatency, peakOf, phraseStart, rotateToPhrase, sliceBlocks, takeFrames } from './capture'
 import type { Block, ChannelMode } from './capture'
 import { ensureRunning } from './context'
 import type { Engine } from './engine'
@@ -84,6 +84,8 @@ const LATENCY_KEY = 'looplab.latency'
 const INPUT_KEY = 'looplab.input'
 const CLICK_COUNT = 5
 const CLICK_GAP = 0.4
+/** How much input is remembered for grabbing after the fact: 8 bars down to about 28 BPM. */
+const ROLL_SEC = 70
 
 const loaded = new WeakSet<BaseAudioContext>()
 
@@ -93,8 +95,9 @@ export class Recorder {
   private node: AudioWorkletNode | null = null
   private sink: GainNode | null = null
   private listeners = new Set<Listener>()
+  /** The last ROLL_SEC of input, always kept while an input is open. */
   private blocks: Block[] = []
-  /** Frame before which captured audio is no longer needed. */
+  /** A take in progress pins audio from this frame so the roll cannot drop it. */
   private keepFrom = Infinity
   private waiters: { end: number; done: () => void }[] = []
   private cancelTake: ((reason: Error) => void) | null = null
@@ -281,9 +284,12 @@ export class Recorder {
       }
       this.peaks[c] = p
     }
-    if (this.keepFrom === Infinity) return
-    if (b.frame + (b.channels[0]?.length ?? 0) <= this.keepFrom) return
     this.blocks.push(b)
+    // Forget what is older than the roll, unless a take in progress still needs it.
+    const floor = Math.min(this.keepFrom, b.frame - ROLL_SEC * this.ctx.sampleRate)
+    let drop = 0
+    while (drop < this.blocks.length - 1 && this.blocks[drop]!.frame + (this.blocks[drop]!.channels[0]?.length ?? 0) <= floor) drop++
+    if (drop) this.blocks.splice(0, drop)
     for (const w of [...this.waiters]) {
       if (covers(this.blocks, w.end)) {
         this.waiters.splice(this.waiters.indexOf(w), 1)
@@ -331,7 +337,6 @@ export class Recorder {
     }
     const from = Math.round((t0 - 0.1) * sr)
     const to = Math.round((times[times.length - 1]! + CLICK_GAP) * sr)
-    this.blocks = []
     this.keepFrom = from
     try {
       await this.until(to)
@@ -345,7 +350,6 @@ export class Recorder {
       return { ok: true, latencySec: r.latencySec, spreadSec: r.spreadSec }
     } finally {
       this.keepFrom = Infinity
-      this.blocks = []
       if (this.is('calibrating')) this.set({ status: 'ready' })
     }
   }
@@ -369,7 +373,6 @@ export class Recorder {
     const latency = this._state.latencySec
     const startFrame = captureStartFrame(at, latency, sr)
 
-    this.blocks = []
     this.keepFrom = startFrame
     let bars: number | null = length === 'free' ? null : length
     this.set({ status: 'armed', startsAt: at, startBar: bar, endsAt: bars === null ? null : at + bars * barSec, bars, barSec, error: null })
@@ -405,12 +408,46 @@ export class Recorder {
       this.cancelTake = null
       this.freeEnd = null
       this.keepFrom = Infinity
-      this.blocks = []
       this.waiters = []
       if (this.is('armed', 'recording')) {
         this.set({ status: 'ready', startsAt: null, startBar: null, endsAt: null, bars: null })
       }
     }
+  }
+
+  /**
+   * Keep what was just played: the last `bars` complete bars, cut from the
+   * rolling memory. Works while playing and after a stop. The result is
+   * rotated onto the phrase so it loops where it was played.
+   */
+  async grab(engine: Engine, bars: number, mode: ChannelMode): Promise<RecordedTake> {
+    if (this._state.status !== 'ready') throw new Error(this.is('closed', 'opening') ? 'Connect an input first.' : 'Finish the take in progress first.')
+    const grid = engine.grid()
+    if (!grid) throw new Error('Play something first: grabbing needs the bar grid.')
+    const sr = this.ctx.sampleRate
+    const latency = this._state.latencySec
+    const window = lastBars(grid, this.ctx.currentTime - latency, bars)
+    if (!window) {
+      const played = Math.max(0, Math.floor(((grid.end ?? this.ctx.currentTime - latency) - grid.start) / grid.barSec))
+      throw new Error(`Only ${played} bar${played === 1 ? '' : 's'} played at this tempo so far. Grab needs ${bars}.`)
+    }
+    const startFrame = captureStartFrame(window.at, latency, sr)
+    const frames = takeFrames(bars, grid.barSec, sr)
+    const first = this.blocks[0]
+    if (!first || first.frame > startFrame) {
+      // Either the input was connected part-way through those bars, or they have aged out of the roll.
+      const heardFor = first ? this.ctx.currentTime - first.frame / sr : 0
+      if (heardFor < ROLL_SEC - 5) {
+        const heardBars = Math.floor(heardFor / grid.barSec)
+        throw new Error(`The input has only been connected for ${heardBars} bar${heardBars === 1 ? '' : 's'}. Grab needs ${bars} bars played with it connected.`)
+      }
+      throw new Error(`Those ${bars} bars are no longer in memory. Loop Lab remembers about the last ${ROLL_SEC} seconds of input.`)
+    }
+    // The newest chunk can be a few milliseconds behind: wait for it, briefly.
+    const arrived = await Promise.race([this.until(startFrame + frames).then(() => true), new Promise<boolean>((r) => setTimeout(() => r(false), 1000))])
+    if (!arrived) throw new Error('The input stopped delivering audio. Reconnect it and try again.')
+    const channels = rotateToPhrase(sliceBlocks(this.blocks, startFrame, frames, mode), window.firstBar, bars)
+    return { channels, sampleRate: sr, bpm: grid.bpm, bars, peak: peakOf(channels) }
   }
 
   /** End a free take on the next bar (at least one bar long). */

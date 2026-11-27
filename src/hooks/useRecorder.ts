@@ -13,6 +13,8 @@ export function useRecorder(): RecorderState & {
   open: (deviceId?: string | null) => Promise<void>
   close: () => void
   record: (length: TakeLength, mode: ChannelMode) => Promise<RecordedTake>
+  /** Keep the last `bars` bars that were just played. */
+  grab: (bars: number, mode: ChannelMode) => Promise<RecordedTake>
   finish: () => void
   cancel: () => void
   calibrate: ReturnType<typeof getRecorder>['calibrate']
@@ -30,6 +32,7 @@ export function useRecorder(): RecorderState & {
   const open = useCallback((id?: string | null) => recorder.open(id), [recorder])
   const close = useCallback(() => recorder.close(), [recorder])
   const record = useCallback((length: TakeLength, mode: ChannelMode) => recorder.record(getEngine(), length, mode), [recorder])
+  const grab = useCallback((bars: number, mode: ChannelMode) => recorder.grab(getEngine(), bars, mode), [recorder])
   const finish = useCallback(() => recorder.finish(), [recorder])
   const cancel = useCallback(() => recorder.cancel(), [recorder])
   const calibrate = useCallback(() => recorder.calibrate(), [recorder])
@@ -42,5 +45,5 @@ export function useRecorder(): RecorderState & {
     return buffer
   }, [])
 
-  return { ...state, open, close, record, finish, cancel, calibrate, setLatency, levels, now, toBuffer }
+  return { ...state, open, close, record, grab, finish, cancel, calibrate, setLatency, levels, now, toBuffer }
 }

@@ -41,6 +41,37 @@ export function phraseStart(transportStart: number, now: number, barSec: number,
   return { at: transportStart + bar * barSec, bar }
 }
 
+/**
+ * The most recent `bars` complete bars on a grid, for grabbing what was just
+ * played. `heard` is the newest moment the input can have delivered (now
+ * minus the round trip); a stopped grid counts no further than its end.
+ * Null when fewer than `bars` bars have been played on this grid.
+ */
+export function lastBars(grid: { start: number; barSec: number; end: number | null }, heard: number, bars: number): { at: number; firstBar: number } | null {
+  if (!(grid.barSec > 0)) return null
+  const limit = grid.end === null ? heard : Math.min(heard, grid.end)
+  const done = Math.floor((limit - grid.start) / grid.barSec + 1e-9)
+  if (done < bars) return null
+  return { at: grid.start + (done - bars) * grid.barSec, firstBar: done - bars }
+}
+
+/**
+ * Rotate a grabbed take so its first bar is one the grid counts as a
+ * multiple of the take length. A loop is circular, so nothing is lost, and
+ * the take then loops in exactly the place it was played against the drums.
+ */
+export function rotateToPhrase(channels: readonly Float32Array[], firstBar: number, bars: number): Float32Array[] {
+  const k = (bars - (firstBar % bars)) % bars // bars to skip to reach the next phrase start
+  return channels.map((c) => {
+    const shift = Math.round((k * c.length) / bars)
+    if (shift === 0) return c.slice()
+    const out = new Float32Array(new ArrayBuffer(c.length * 4))
+    out.set(c.subarray(shift), 0)
+    out.set(c.subarray(0, shift), c.length - shift)
+    return out
+  })
+}
+
 /** True once the captured blocks reach `endFrame` (exclusive). */
 export function covers(blocks: readonly Block[], endFrame: number): boolean {
   const last = blocks[blocks.length - 1]
