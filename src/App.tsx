@@ -268,11 +268,11 @@ function Studio() {
   }
 
   return (
-    <main className="min-h-screen bg-cream pb-28 text-ink">
+    <main className="photo-bg min-h-screen pb-28 text-ink">
       <header className="grid grid-cols-1 items-center gap-2 px-4 pt-5 text-center md:grid-cols-3 md:px-6 md:text-left">
         <span className="hidden md:block" />
         <span className="headline text-center text-[2.8rem] leading-none">LOOP LAB</span>
-        <span className="mono-label flex justify-center gap-4 text-muted md:justify-end">
+        <span className="mono-label flex justify-center gap-4 md:justify-end">
           <button type="button" onClick={toggleTheme} aria-pressed={theme === 'dark'} className="underline underline-offset-4 hover:text-accent">
             {theme === 'dark' ? 'light mode' : 'dark mode'}
           </button>
@@ -303,8 +303,9 @@ function Studio() {
         />
       </div>
 
+      <div className="paper mt-8">
       {(notice || error || engine.error) && (
-        <div className="px-4 pt-6 md:px-6">
+        <div className="px-4 py-6 md:px-6">
           {notice && (
             <p className="caption">
               {notice}{' '}
@@ -315,7 +316,7 @@ function Studio() {
         </div>
       )}
 
-      <div className="mt-8">
+      <div>
         {showFavorites && (
           <Section
             id="favorites"
@@ -475,8 +476,9 @@ function Studio() {
         )}
 
       </div>
+      </div>
 
-      <footer className="border-t border-line px-4 py-6 md:px-6">
+      <footer className="paper border-t border-line px-4 py-6 md:px-6">
         <div className="mono-label flex justify-between text-muted">
           <span>Loop Lab</span>
           <span>Varispeed · bar-quantized</span>

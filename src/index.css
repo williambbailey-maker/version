@@ -46,6 +46,41 @@
   }
 }
 
+/* Studio photo backdrop: the photo is pinned behind the whole app, washed
+   with the paper colour so the line drawing stays legible, and the reading
+   sections sit on near-opaque paper. Both washes follow the theme. */
+.photo-bg {
+  position: relative;
+  isolation: isolate;
+}
+.photo-bg::before,
+.photo-bg::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100lvh; /* large viewport: no jump when the phone toolbar hides */
+  pointer-events: none;
+}
+.photo-bg::before {
+  z-index: -2;
+  background: var(--color-cream) url("/bg/studio.jpg") center / cover no-repeat;
+}
+.photo-bg::after {
+  z-index: -1;
+  background: color-mix(in srgb, var(--color-cream) 48%, transparent);
+}
+.paper {
+  background: color-mix(in srgb, var(--color-cream) 91%, transparent);
+}
+:root[data-theme="dark"] .photo-bg::after {
+  background: color-mix(in srgb, var(--color-cream) 58%, transparent);
+}
+:root[data-theme="dark"] .paper {
+  background: color-mix(in srgb, var(--color-cream) 88%, transparent);
+}
+
 /* Small uppercase mono label. */
 @utility mono-label {
   font-family: var(--font-mono);
