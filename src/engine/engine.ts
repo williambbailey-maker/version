@@ -35,11 +35,20 @@ export type EngineState = {
   drums: SlotState
   boost: BoostState // drum booster (compressor chain)
   samples: SlotState[] // one per active sample loop, in the order they were added
+  masterGain: number // output level after all tracks: 0..MASTER_MAX, 1 = unchanged
   loading: readonly string[] // loop ids currently being fetched/decoded
   error: string | null
 }
 
 type Listener = () => void
+
+/** Top of the master fader: twice unity (about +6 dB). Halfway is unchanged. */
+export const MASTER_MAX = 2
+
+/** Clamp a requested master level into the fader's range. Pure, so it is unit-tested. */
+export function clampMaster(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(MASTER_MAX, value)) : 1
+}
 
 /**
  * One drum slot (the master clock) plus any number of sample slots, all
@@ -61,6 +70,7 @@ export class Engine {
   private listeners = new Set<Listener>()
   private loading = new Set<string>()
   private error: string | null = null
+  private masterLevel = 1
   /** Scheduled stop boundary, if a bar-quantized stop is in flight. */
   private stopAt: number | null = null
   /** The drum loop still being fetched/decoded, so play() can wait for it. */
@@ -311,8 +321,11 @@ export class Engine {
     else await this.play()
   }
 
+  /** Overall output level, 0..MASTER_MAX. Above 1 boosts; a loud mix can clip. */
   setMasterGain(value: number): void {
-    this.master.gain.setTargetAtTime(Math.max(0, Math.min(1, value)), this.ctx.currentTime, 0.01)
+    this.masterLevel = clampMaster(value)
+    this.master.gain.setTargetAtTime(this.masterLevel, this.ctx.currentTime, 0.01)
+    this.emit()
   }
 
   // ---- internals ---------------------------------------------------------
@@ -417,6 +430,7 @@ export class Engine {
       drums: s(this.drums),
       boost: this.boost,
       samples: [...this.samples.values()].map(s),
+      masterGain: this.masterLevel,
       loading: [...this.loading],
       error: this.error,
     }

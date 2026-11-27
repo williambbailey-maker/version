@@ -14,7 +14,7 @@ import { SetPassword } from './components/SetPassword'
 import { TidyStorage } from './components/TidyStorage'
 import { Uploader } from './components/Uploader'
 import { ensureRunning, getContext } from './engine/context'
-import { getEngine } from './engine/engine'
+import { clampMaster, getEngine } from './engine/engine'
 import { useEngine } from './hooks/useEngine'
 import { neighborSample } from './lib/neighbors'
 import { applyTheme, readTheme } from './lib/theme'
@@ -31,6 +31,9 @@ import { deleteSession, listSessions, resolveStack, saveSession, snapshotStack, 
 import type { Session } from './lib/sessions'
 import { supabase } from './lib/supabase'
 import type { Loop } from './engine/types'
+
+/** Where the master fader position is remembered on this device. */
+const MASTER_KEY = 'looplab.master'
 
 export default function App() {
   const { session, recovering, finishRecovery } = useSession()
@@ -61,6 +64,16 @@ function Studio() {
       // private mode
     }
   }, [packFilter])
+  // Restore the master fader from the last visit.
+  const { setMasterGain } = engine
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(MASTER_KEY)
+      if (saved !== null) setMasterGain(clampMaster(Number(saved)))
+    } catch {
+      // private mode
+    }
+  }, [setMasterGain])
   const [preset, setPreset] = useState<LibraryPreset | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -160,6 +173,16 @@ function Studio() {
         fail(e)
       }
     })()
+  }
+
+  /** Master fader: applied at once and remembered on this device. */
+  const onMasterGain = (value: number) => {
+    engine.setMasterGain(value)
+    try {
+      localStorage.setItem(MASTER_KEY, String(clampMaster(value)))
+    } catch {
+      /* private mode: just not remembered */
+    }
   }
 
   /** Fader moves ramp immediately; the value is saved to the library after a short pause. */
@@ -400,6 +423,8 @@ function Studio() {
             boost={engine.boost}
             onBoost={engine.setBoost}
             onBoostPreset={engine.setBoostPreset}
+            masterGain={engine.masterGain}
+            onMasterGain={onMasterGain}
           />
         </Section>
 

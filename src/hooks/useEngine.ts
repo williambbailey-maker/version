@@ -15,6 +15,7 @@ export function useEngine(): EngineState & {
   removeSample: (loopId: string) => void
   replaceSample: (oldId: string, loop: Loop) => Promise<void>
   setGain: (loopId: string, value: number) => void
+  setMasterGain: (value: number) => void
   setMuted: (loopId: string, muted: boolean) => void
   setSolo: (loopId: string, solo: boolean) => void
   setSpeed: (loopId: string, speed: 1 | 2) => void
@@ -34,6 +35,7 @@ export function useEngine(): EngineState & {
   const removeSample = useCallback((id: string) => engine.removeSample(id), [engine])
   const replaceSample = useCallback((id: string, loop: Loop) => engine.replaceSample(id, loop), [engine])
   const setGain = useCallback((id: string, v: number) => engine.setGain(id, v), [engine])
+  const setMasterGain = useCallback((v: number) => engine.setMasterGain(v), [engine])
   const setMuted = useCallback((id: string, m: boolean) => engine.setMuted(id, m), [engine])
   const setSolo = useCallback((id: string, v: boolean) => engine.setSolo(id, v), [engine])
   const setSpeed = useCallback((id: string, v: 1 | 2) => engine.setSpeed(id, v), [engine])
@@ -42,5 +44,5 @@ export function useEngine(): EngineState & {
   const isActive = useCallback((id: string) => engine.isActive(id), [engine])
   const loadStack = useCallback<Engine['loadStack']>((stack) => engine.loadStack(stack), [engine])
 
-  return { ...state, play, stop, toggle, select, removeSample, replaceSample, setGain, setMuted, setSolo, setSpeed, setBoost, setBoostPreset, isActive, loadStack }
+  return { ...state, play, stop, toggle, select, removeSample, replaceSample, setGain, setMasterGain, setMuted, setSolo, setSpeed, setBoost, setBoostPreset, isActive, loadStack }
 }
