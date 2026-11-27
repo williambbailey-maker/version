@@ -67,6 +67,9 @@ jobs:
           lipo -archs "$BIN"
           codesign --verify --deep --strict --verbose=2 "$APP"
           ls -lh src-tauri/target/universal-apple-darwin/release/bundle/dmg/
+          # Recording needs both of these, or macOS blocks the audio input.
+          plutil -p "$APP/Contents/Info.plist" | grep NSMicrophoneUsageDescription
+          codesign -d --entitlements - "$APP" 2>&1 | grep -A1 com.apple.security.device.audio-input
           # Launch it and make sure it is still running after 20 seconds.
           "$BIN" & PID=$!
           sleep 20
