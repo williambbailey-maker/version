@@ -460,9 +460,14 @@ function Studio() {
               isActive={engine.isActive}
               onAudition={onSelect}
               onKept={(temp, saved) => {
-                // The saved copy takes over from the in-memory take, so sessions can find it later.
-                if (engine.isActive(temp.id)) engine.replaceSample(temp.id, saved).catch(fail)
-                reload()
+                // A saved take always ends up in the stack. If the in-memory take was
+                // already there, the saved copy takes its place (same column, same
+                // level); otherwise it joins on the next bar, or waits for Play.
+                const level = engine.samples.find((x) => (x.loop ?? x.pending)?.id === temp.id)?.gain
+                const joined = engine.isActive(temp.id) ? engine.replaceSample(temp.id, saved) : engine.isActive(saved.id) ? Promise.resolve() : engine.select(saved)
+                // A level set while auditioning is the level it is saved with.
+                const levelled = level !== undefined && level !== saved.gain ? updateLoop(saved.id, { gain: level }) : Promise.resolve()
+                Promise.all([joined, levelled]).catch(fail).finally(reload)
               }}
             />
           </Section>

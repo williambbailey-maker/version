@@ -30,7 +30,7 @@ type Props = {
   isActive: (loopId: string) => boolean
   /** Toggle a take in or out of the mix (bar-quantized, like tapping a sample). */
   onAudition: (loop: Loop) => void
-  /** A take was saved to the library as `saved`; `temp` was its in-memory stand-in. */
+  /** A take was saved to the library as `saved`; `temp` was its in-memory stand-in. The app adds `saved` to the mix. */
   onKept: (temp: Loop, saved: Loop) => void
 }
 
@@ -90,14 +90,14 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
     const blob = new Blob([encodeWav(t.channels, t.sampleRate, 24)], { type: 'audio/wav' })
     download(blob, takeFileName(t.name, t.bpm, t.bars))
     if (!t.loop) {
-      patch(t.id, { status: 'kept', note: 'Saved to Downloads. Free takes are not added to the library, which holds 1, 2, 4 and 8 bar loops.' })
+      patch(t.id, { status: 'kept', note: 'Saved to Downloads. Free takes are not added to the library or the mix, which hold 1, 2, 4 and 8 bar loops.' })
       return
     }
     patch(t.id, { status: 'saving', note: undefined })
     try {
       const packId = await ensurePack(PACK)
       const saved = await uploadBlob(blob, 'wav', 'audio/wav', { name: t.name, bpm: t.bpm, bars: t.loop.bars, kind: 'sample', tags: ['take'], pack: PACK, packId, duration: t.channels[0]!.length / t.sampleRate }, t.loop.buffer)
-      patch(t.id, { status: 'kept', note: 'Saved to the library (pack "Takes") and to Downloads.' })
+      patch(t.id, { status: 'kept', note: 'Saved to the library (pack "Takes") and to Downloads, and added to the mix.' })
       onKept(t.loop, saved)
     } catch (e) {
       patch(t.id, { status: 'failed', note: `Saved to Downloads, but the library upload failed: ${e instanceof Error ? e.message : String(e)}` })
@@ -230,7 +230,7 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
                   )}
                   {t.status !== 'kept' && (
                     <button type="button" onClick={() => void keep(t)} disabled={t.status === 'saving'} className="pill min-h-9 px-4">
-                      {t.status === 'saving' ? 'Saving…' : t.status === 'failed' ? 'Try again' : 'Keep'}
+                      {t.status === 'saving' ? 'Saving…' : t.status === 'failed' ? 'Try again' : 'Save'}
                     </button>
                   )}
                   <button type="button" onClick={() => discard(t)} disabled={t.status === 'saving'} aria-label={t.status === 'kept' ? `Clear ${t.name} from this list` : `Discard ${t.name}`} className="pill pill-outline min-h-9 px-3">
