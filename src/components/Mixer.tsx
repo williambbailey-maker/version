@@ -1,4 +1,5 @@
 import { BOOST_PRESETS } from '../engine/booster'
+import { MASTER_MAX } from '../engine/engine'
 import type { BoostState, SlotState } from '../engine/engine'
 import type { Loop } from '../engine/types'
 import { StripeFader } from './StripeFader'
@@ -26,10 +27,13 @@ type Props = {
   boost: BoostState
   onBoost: (on: boolean) => void
   onBoostPreset: (id: string) => void
+  /** Overall output level, 0..MASTER_MAX (1 = unchanged). */
+  masterGain: number
+  onMasterGain: (value: number) => void
 }
 
 /** What's playing (or queued): one stripe column each. */
-export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, onStep, favoriteIds, onFavorite, boost, onBoost, onBoostPreset }: Props) {
+export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, onStep, favoriteIds, onFavorite, boost, onBoost, onBoostPreset, masterGain, onMasterGain }: Props) {
   const cols: { slot: SlotState; loop: Loop; removable: boolean }[] = []
   const d = drums.loop ?? drums.pending
   if (d) cols.push({ slot: drums, loop: d, removable: false })
@@ -160,6 +164,26 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
           </div>
         )
       })}
+      {/* Master: after the last track, sets the level of everything together. */}
+      <div className="flex min-w-0 flex-col gap-2 border-l border-line pl-4">
+        <StripeFader value={masterGain / MASTER_MAX} label="Master" onChange={(v) => onMasterGain(v * MASTER_MAX)} tone="ink" />
+        <button
+          type="button"
+          aria-label="Reset master volume to 100"
+          title="Back to 100, where the mix is unchanged"
+          disabled={masterGain === 1}
+          onClick={() => onMasterGain(1)}
+          className="pill pill-outline min-h-7 px-2 disabled:opacity-40"
+        >
+          Reset
+        </button>
+        <div className="mono-label flex items-baseline justify-between gap-2 text-muted">
+          <span>Out</span>
+          <span>{Math.round(masterGain * 100)}</span>
+        </div>
+        <span className="mono-label truncate font-bold">Master</span>
+        <span className="tag self-start">All tracks</span>
+      </div>
     </div>
   )
 }

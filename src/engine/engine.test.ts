@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Engine } from './engine'
+import { Engine, MASTER_MAX, clampMaster } from './engine'
 import type { Loop } from './types'
 
 /** Minimal fake of the Web Audio surface the engine touches. */
@@ -324,5 +324,36 @@ describe('Engine', () => {
     await engine.play()
     const a = calls.find((c) => c.kind === 'start' && c.loop === 'a')!
     expect(a.offset).toBeCloseTo(0.025, 10)
+  })
+
+  it('master fader sets the output gain, boosts above unity, and stays in range', () => {
+    const { engine, gains } = make()
+    const master = gains[0]!
+    expect(engine.state.masterGain).toBe(1)
+    engine.setMasterGain(1.5)
+    expect(master.gain.target).toBe(1.5)
+    expect(engine.state.masterGain).toBe(1.5)
+    engine.setMasterGain(9)
+    expect(master.gain.target).toBe(MASTER_MAX)
+    engine.setMasterGain(-1)
+    expect(master.gain.target).toBe(0)
+    expect(engine.state.masterGain).toBe(0)
+  })
+
+  it('master fader leaves the individual track levels alone', async () => {
+    const { engine, targets } = make()
+    await engine.select(loop('d', 'drums', 100))
+    await engine.select(loop('a', 'sample', 88, 2, 0.15))
+    const before = targets()
+    engine.setMasterGain(2)
+    expect(targets()).toEqual(before)
+    expect(engine.state.drums.gain).toBe(0.8)
+    expect(engine.state.samples[0]!.gain).toBe(0.15)
+  })
+
+  it('clampMaster falls back to unity for junk', () => {
+    expect(clampMaster(Number.NaN)).toBe(1)
+    expect(clampMaster(0.5)).toBe(0.5)
+    expect(clampMaster(3)).toBe(MASTER_MAX)
   })
 })

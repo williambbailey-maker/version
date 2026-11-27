@@ -1,4 +1,4 @@
-export { Engine, getEngine } from './engine'
+export { Engine, getEngine, MASTER_MAX, clampMaster } from './engine'
 export type { EngineState, SlotState } from './engine'
 export { Transport, nextBar, barIndex, barSeconds, playbackRate } from './transport'
 export { Slot } from './slot'
