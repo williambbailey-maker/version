@@ -335,21 +335,6 @@
   letter-spacing: 0.08em;
 }
 
-.cloud {
-  animation: drift 28s linear infinite;
-}
-.cloud.b {
-  animation-duration: 40s;
-  animation-delay: -18s;
-}
-.cloud.c {
-  animation-duration: 34s;
-  animation-delay: -9s;
-}
-@keyframes drift {
-  from { transform: translateX(-120px); }
-  to { transform: translateX(560px); }
-}
 
 .leaf {
   transform-origin: 120px 300px;
@@ -392,7 +377,7 @@
   50% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cloud, .leaf, .playing .platter, .cursor-blink {
+  .leaf, .playing .platter, .cursor-blink {
     animation: none !important;
   }
 }
