@@ -7,6 +7,8 @@ import { Library } from './components/Library'
 import type { LibraryPreset } from './components/Library'
 import { Login } from './components/Login'
 import { Mixer } from './components/Mixer'
+import { RecordPanel } from './components/RecordPanel'
+import type { Take } from './components/RecordPanel'
 import { Room } from './components/Room'
 import { Section } from './components/Section'
 import { Sessions } from './components/Sessions'
@@ -79,6 +81,12 @@ function Studio() {
   const [notice, setNotice] = useState<string | null>(null)
   const [showUploader, setShowUploader] = useState(false)
   const [showRetempo, setShowRetempo] = useState(false)
+  const [showRecord, setShowRecord] = useState(false)
+  const [takes, setTakes] = useState<Take[]>([])
+  const openRecord = () => {
+    setShowRecord(true)
+    setTimeout(() => jump('record'), 30)
+  }
   const openRetempo = () => {
     setShowRetempo(true)
     setTimeout(() => jump('retempo'), 30)
@@ -140,6 +148,8 @@ function Studio() {
       }
     })()
   }
+
+  const libraryNames = useMemo(() => library.map((l) => l.name), [library])
 
   // ---- favorites
   const favorites = useMemo(() => library.filter((l) => l.kind === 'sample' && l.favorite), [library])
@@ -402,6 +412,9 @@ function Studio() {
                   </button>
                 )
               )}
+              <button type="button" onClick={openRecord} aria-expanded={showRecord} className="pill pill-outline">
+                Record
+              </button>
               <button type="button" onClick={openSessions} disabled={!hasStack} className="pill pill-outline">
                 Save stack
               </button>
@@ -427,6 +440,33 @@ function Studio() {
             onMasterGain={onMasterGain}
           />
         </Section>
+
+        {showRecord && (
+          <Section
+            id="record"
+            label="Record"
+            aside={
+              <button type="button" onClick={() => setShowRecord(false)} className="pill pill-outline">
+                Hide
+              </button>
+            }
+          >
+            <RecordPanel
+              takes={takes}
+              setTakes={setTakes}
+              playing={engine.playing}
+              hasStack={hasStack}
+              libraryNames={libraryNames}
+              isActive={engine.isActive}
+              onAudition={onSelect}
+              onKept={(temp, saved) => {
+                // The saved copy takes over from the in-memory take, so sessions can find it later.
+                if (engine.isActive(temp.id)) engine.replaceSample(temp.id, saved).catch(fail)
+                reload()
+              }}
+            />
+          </Section>
+        )}
 
         <Section id="library" label="Library" sub="tap a drum loop for the clock, tap samples to layer">
           {loops === null && !error ? (
