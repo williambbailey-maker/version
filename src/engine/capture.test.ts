@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { captureStartFrame, covers, measureLatency, nextTakeNumber, peakOf, phraseStart, sliceBlocks, takeFileName, takeFrames, takeName, toDb } from './capture'
+import { captureStartFrame, covers, lastBars, measureLatency, nextTakeNumber, peakOf, rotateToPhrase, phraseStart, sliceBlocks, takeFileName, takeFrames, takeName, toDb } from './capture'
 import type { Block } from './capture'
 import { matchDevice } from './recorder'
 
@@ -43,6 +43,34 @@ describe('phraseStart', () => {
     // transport starts in 0.1 s; from stopped, one whole pass is the count-in
     expect(phraseStart(10, 9.9, barSec, 4, 0.15, 4)).toEqual({ at: 10 + 4 * barSec, bar: 4 })
     expect(phraseStart(10, 9.9, barSec, 1, 0.15, 1)).toEqual({ at: 10 + barSec, bar: 1 })
+  })
+})
+
+describe('grabbing what was just played', () => {
+  const grid = { start: 10, barSec: 2, end: null }
+  it('takes the bars before the last bar line', () => {
+    // 11.4 bars in: bars 3..10 are the last 8 complete ones
+    expect(lastBars(grid, 10 + 11.4 * 2, 8)).toEqual({ at: 10 + 3 * 2, firstBar: 3 })
+    expect(lastBars(grid, 10 + 16 * 2, 8)).toEqual({ at: 10 + 8 * 2, firstBar: 8 })
+  })
+  it('refuses until that many bars have been played', () => {
+    expect(lastBars(grid, 10 + 7.9 * 2, 8)).toBeNull()
+    expect(lastBars(grid, 10 + 8 * 2, 8)).toEqual({ at: 10, firstBar: 0 })
+  })
+  it('after a stop, counts no further than where playback ended', () => {
+    const stopped = { start: 10, barSec: 2, end: 10 + 12 * 2 }
+    expect(lastBars(stopped, 500, 8)).toEqual({ at: 10 + 4 * 2, firstBar: 4 })
+    // the tail of the last bar has not arrived yet: hold at the bar before
+    expect(lastBars(stopped, 10 + 11.5 * 2, 8)).toEqual({ at: 10 + 3 * 2, firstBar: 3 })
+  })
+  it('rotates a grab so it loops where it was played', () => {
+    // 4 bars of 2 frames, each frame labelled with the grid bar it was played in
+    const take = (first: number) => [Float32Array.from([first, first, first + 1, first + 1, first + 2, first + 2, first + 3, first + 3])]
+    const barOf = (c: Float32Array[]) => [c[0]![0]! % 4, c[0]![2]! % 4, c[0]![4]! % 4, c[0]![6]! % 4]
+    expect(barOf(rotateToPhrase(take(8), 8, 4))).toEqual([0, 1, 2, 3]) // already on the phrase
+    expect(barOf(rotateToPhrase(take(5), 5, 4))).toEqual([0, 1, 2, 3])
+    expect(barOf(rotateToPhrase(take(7), 7, 4))).toEqual([0, 1, 2, 3])
+    expect(rotateToPhrase(take(5), 5, 4)[0]).toEqual(Float32Array.from([8, 8, 5, 5, 6, 6, 7, 7]))
   })
 })
 
