@@ -37,12 +37,6 @@ export function Room(props: Props) {
   const { playing, tagCounts, packs, packStats, sessionsCount, roomMap, selectedPack, favoritesCount, onFavorites, onSessions, onAdd, onDropFiles, onRetempo, onTag, onPack } = props
   const [room, setRoom] = useState(0)
   const [basketOver, setBasketOver] = useState(false)
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 10000)
-    return () => clearInterval(t)
-  }, [])
 
   const count = (tag: string) => tagCounts.get(tag) ?? 0
   const tipFor = (obj: RoomObject) => `#${roomMap[obj].toUpperCase()} · ${count(roomMap[obj])}`
@@ -70,46 +64,8 @@ export function Room(props: Props) {
     },
   })
 
-  // analogue clock hands
-  const minutes = now.getMinutes() + now.getSeconds() / 60
-  const hours = (now.getHours() % 12) + minutes / 60
-  const hand = (cx: number, cy: number, len: number, deg: number) => {
-    const r = ((deg - 90) * Math.PI) / 180
-    return `M${cx} ${cy}L${(cx + len * Math.cos(r)).toFixed(1)} ${(cy + len * Math.sin(r)).toFixed(1)}`
-  }
-
   const desk = (
     <svg className={['scene block h-auto w-full', playing ? 'playing' : ''].join(' ')} viewBox="8 0 1000 420" role="group" aria-label="The desk">
-      <defs>
-        <clipPath id="win">
-          <rect x="200" y="50" width="670" height="164" />
-        </clipPath>
-      </defs>
-      {/* the view outside: drifting clouds, clipped to the window */}
-      <g clipPath="url(#win)">
-        <g className="cloud">
-          <path className="l" d="M300 130c-14 0-22-9-22-19 0-13 12-21 24-18 4-13 18-20 30-14 8-8 25-6 29 6 12-3 24 5 24 16 0 12-10 20-22 20z" />
-        </g>
-        <g className="cloud b">
-          <path className="l" d="M230 190c-10 0-16-6-16-13 0-9 9-15 17-13 3-9 13-14 21-10 6-6 18-4 21 4 9-2 17 4 17 11 0 9-7 14-16 14z" />
-        </g>
-        <g className="cloud c">
-          <path className="l" d="M560 96c-12 0-19-8-19-16 0-11 10-18 20-15 3-11 15-17 25-12 7-7 21-5 24 5 10-2 20 4 20 13 0 10-8 17-18 17z" />
-        </g>
-      </g>
-      <rect className="l" x="200" y="50" width="670" height="164" rx="3" />
-      <line className="l" x1="423" y1="50" x2="423" y2="214" />
-      <line className="l" x1="647" y1="50" x2="647" y2="214" />
-      <line className="l" x1="200" y1="132" x2="870" y2="132" />
-
-
-      {/* analogue wall clock */}
-      <circle className="w" cx="920" cy="50" r="26" />
-      <path className="l" d="M920 28v4M920 68v4M898 50h4M938 50h4" />
-      <path className="l" d={hand(920, 50, 12, hours * 30)} />
-      <path className="l" d={hand(920, 50, 18, minutes * 6)} />
-      <circle className="f" cx="920" cy="50" r="2" />
-
       {/* headphones → sessions */}
       <g {...hotProps(`Headphones: saved sessions (${sessionsCount})`, onSessions)}>
         <circle className="f" cx="90" cy="70" r="4" />
@@ -304,27 +260,6 @@ export function Room(props: Props) {
 
   const shelf = (
     <svg className="scene block h-auto w-full" viewBox="0 0 1000 420" role="group" aria-label="The shelf">
-      <defs>
-        <clipPath id="win2">
-          <rect x="200" y="50" width="670" height="164" />
-        </clipPath>
-      </defs>
-      {/* the same window as the desk, behind the records */}
-      <g clipPath="url(#win2)">
-        <g className="cloud">
-          <path className="l" d="M300 130c-14 0-22-9-22-19 0-13 12-21 24-18 4-13 18-20 30-14 8-8 25-6 29 6 12-3 24 5 24 16 0 12-10 20-22 20z" />
-        </g>
-        <g className="cloud b">
-          <path className="l" d="M230 190c-10 0-16-6-16-13 0-9 9-15 17-13 3-9 13-14 21-10 6-6 18-4 21 4 9-2 17 4 17 11 0 9-7 14-16 14z" />
-        </g>
-        <g className="cloud c">
-          <path className="l" d="M560 96c-12 0-19-8-19-16 0-11 10-18 20-15 3-11 15-17 25-12 7-7 21-5 24 5 10-2 20 4 20 13 0 10-8 17-18 17z" />
-        </g>
-      </g>
-      <rect className="l" x="200" y="50" width="670" height="164" rx="3" />
-      <line className="l" x1="423" y1="50" x2="423" y2="214" />
-      <line className="l" x1="647" y1="50" x2="647" y2="214" />
-      <line className="l" x1="200" y1="132" x2="870" y2="132" />
       <path className="l" d={`M40 ${SHELF_Y}h920`} />
       {spines.map(spine)}
       {packs.length === 0 && (

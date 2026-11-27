@@ -1,3 +1,4 @@
+import { fetchAll } from './paging'
 import type { Bars, Loop, LoopKind } from '../engine/types'
 import { defaultGain } from '../engine/types'
 import { BUCKET, supabase } from './supabase'
@@ -71,13 +72,19 @@ export async function currentUserId(): Promise<string> {
   return data.user.id
 }
 
+/** The whole library. Paged: one request stops at 1000 rows. */
 export async function listLoops(): Promise<Loop[]> {
-  const { data, error } = await supabase
-    .from('loops')
-    .select(LOOP_COLUMNS)
-    .order('created_at', { ascending: true })
-  if (error) throw new Error(error.message)
-  return (data as LoopRow[]).map(fromRow)
+  const rows = await fetchAll(async (from, to) => {
+    const { data, error } = await supabase
+      .from('loops')
+      .select(LOOP_COLUMNS)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to)
+    if (error) throw new Error(error.message)
+    return data as LoopRow[]
+  })
+  return rows.map(fromRow)
 }
 
 // ---- packs ------------------------------------------------------------------
@@ -302,13 +309,13 @@ export async function uploadBlob(
 
 /** Source paths already imported (for skipping reruns). */
 export async function existingSourcePaths(): Promise<Set<string>> {
-  const out = new Set<string>()
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.from('loops').select('source_path').range(from, from + 999)
+  const rows = await fetchAll(async (from, to) => {
+    const { data, error } = await supabase.from('loops').select('source_path').order('id').range(from, to)
     if (error) throw new Error(error.message)
-    for (const r of data as { source_path: string | null }[]) if (r.source_path) out.add(r.source_path)
-    if (data.length < 1000) break
-  }
+    return data as { source_path: string | null }[]
+  })
+  const out = new Set<string>()
+  for (const r of rows) if (r.source_path) out.add(r.source_path)
   return out
 }
 
@@ -354,15 +361,17 @@ export async function listStorageFiles(): Promise<StoredFile[]> {
 
 /** Files in storage that no loop row points at any more. */
 export async function orphanedFiles(): Promise<StoredFile[]> {
-  const referenced = new Set<string>()
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.from('loops').select('storage_path,original_path').range(from, from + 999)
+  // Ordered by id so no row can slip between pages: a file missed here
+  // would be offered for deletion.
+  const rows = await fetchAll(async (from, to) => {
+    const { data, error } = await supabase.from('loops').select('storage_path,original_path').order('id').range(from, to)
     if (error) throw new Error(error.message)
-    for (const r of data as { storage_path: string | null; original_path: string | null }[]) {
-      if (r.storage_path) referenced.add(r.storage_path)
-      if (r.original_path) referenced.add(r.original_path)
-    }
-    if (data.length < 1000) break
+    return data as { storage_path: string | null; original_path: string | null }[]
+  })
+  const referenced = new Set<string>()
+  for (const r of rows) {
+    if (r.storage_path) referenced.add(r.storage_path)
+    if (r.original_path) referenced.add(r.original_path)
   }
   return (await listStorageFiles()).filter((f) => !referenced.has(f.path))
 }
