@@ -27,7 +27,7 @@ type Props = {
   onUploaded: () => void
 }
 
-const BARS: Bars[] = [1, 2, 4, 8]
+const BARS: Bars[] = [1, 2, 4, 8, 16]
 
 /**
  * Drop loops in, see their tempo, type the tempo you want, and export

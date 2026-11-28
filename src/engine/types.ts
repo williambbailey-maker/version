@@ -1,4 +1,4 @@
-export type Bars = 1 | 2 | 4 | 8
+export type Bars = 1 | 2 | 4 | 8 | 16
 
 export type LoopKind = 'drums' | 'sample'
 
@@ -7,7 +7,7 @@ export type Loop = {
   name: string
   url: string          // Supabase Storage (or /dev/*.wav in phase 1)
   bpm: number          // native tempo of the recording
-  bars: Bars           // length in bars, 4/4 assumed
+  bars: Bars           // length in bars, 4/4 assumed (a power of two up to 16)
   kind: LoopKind
   gain: number         // 0..1, default 0.8
   buffer?: AudioBuffer // decoded, in-memory only
@@ -33,7 +33,7 @@ export function defaultGain(kind: LoopKind): number {
 }
 
 export function isPowerOfTwoBars(bars: number): bars is Bars {
-  return bars === 1 || bars === 2 || bars === 4 || bars === 8
+  return bars === 1 || bars === 2 || bars === 4 || bars === 8 || bars === 16
 }
 
 /** Musical length of a loop in seconds at its native tempo. */

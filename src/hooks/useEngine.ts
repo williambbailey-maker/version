@@ -19,8 +19,8 @@ export function useEngine(): EngineState & {
   setMuted: (loopId: string, muted: boolean) => void
   setSolo: (loopId: string, solo: boolean) => void
   setSpeed: (loopId: string, speed: 1 | 2) => void
-  setBoost: (on: boolean) => void
-  setBoostPreset: (id: string) => void
+  setBoost: (loopId: string, on: boolean) => void
+  setBoostPreset: (loopId: string, id: string) => void
   isActive: (loopId: string) => boolean
   loadStack: Engine['loadStack']
 } {
@@ -39,8 +39,8 @@ export function useEngine(): EngineState & {
   const setMuted = useCallback((id: string, m: boolean) => engine.setMuted(id, m), [engine])
   const setSolo = useCallback((id: string, v: boolean) => engine.setSolo(id, v), [engine])
   const setSpeed = useCallback((id: string, v: 1 | 2) => engine.setSpeed(id, v), [engine])
-  const setBoost = useCallback((on: boolean) => engine.setBoost(on), [engine])
-  const setBoostPreset = useCallback((id: string) => engine.setBoostPreset(id), [engine])
+  const setBoost = useCallback((loopId: string, on: boolean) => engine.setBoost(loopId, on), [engine])
+  const setBoostPreset = useCallback((loopId: string, id: string) => engine.setBoostPreset(loopId, id), [engine])
   const isActive = useCallback((id: string) => engine.isActive(id), [engine])
   const loadStack = useCallback<Engine['loadStack']>((stack) => engine.loadStack(stack), [engine])
 

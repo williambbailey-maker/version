@@ -1,5 +1,9 @@
+import { Booster, DEFAULT_PRESET_ID, boostPreset } from './booster'
 import type { LoadedLoop, LoopKind } from './types'
 import { loopLengthSec } from './types'
+
+/** A track's effect: whether it is on, and which preset it runs. */
+export type BoostState = { on: boolean; preset: string }
 
 /** Time constant for gain ramps (setTargetAtTime). ~15 ms reaches ~95%. */
 const GAIN_TAU = 0.005
@@ -18,6 +22,9 @@ export class Slot {
   readonly input: GainNode
   readonly gain: GainNode
   private insert: { input: AudioNode; output: AudioNode } | null = null
+  /** This track's effect chain, built the first time it is switched on. */
+  private booster: Booster | null = null
+  private _boost: BoostState = { on: false, preset: DEFAULT_PRESET_ID }
 
   private ctx: BaseAudioContext
   private node: AudioBufferSourceNode | null = null
@@ -53,6 +60,29 @@ export class Slot {
     } else {
       this.input.connect(this.gain)
     }
+  }
+
+  /** Effect state for this track (the chain itself stays private). */
+  get boost(): BoostState {
+    return this._boost
+  }
+
+  /** Effect on/off. Ramped inside the chain, so it never clicks. */
+  setBoost(on: boolean): void {
+    if (on && !this.booster) {
+      this.booster = new Booster(this.ctx)
+      this.booster.apply(boostPreset(this._boost.preset).params)
+      this.setInsert(this.booster)
+    }
+    this._boost = { ...this._boost, on }
+    this.booster?.setOn(on)
+  }
+
+  /** Choose the preset; an unknown id falls back to the default. */
+  setBoostPreset(id: string): void {
+    const preset = boostPreset(id)
+    this._boost = { ...this._boost, preset: preset.id }
+    this.booster?.apply(preset.params)
   }
 
   /** The loop currently sounding (or scheduled to start). */
@@ -144,15 +174,14 @@ export class Slot {
     const node = this.node
     this._pending = null
     this._loop = null
-    if (!node) {
+    const release = () => {
       this.input.disconnect()
       this.gain.disconnect()
-      return
+      this.booster?.dispose()
+      this.booster = null
     }
-    this.stopNode(at, () => {
-      this.input.disconnect()
-      this.gain.disconnect()
-    })
+    if (!node) return release()
+    this.stopNode(at, release)
   }
 
   /** Fader position only; call the engine's applyMix() to make it audible. */

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { takeFileName, takeName, nextTakeNumber, toDb } from '../engine/capture'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { barPeaks, clampSelection, cutBars, lengthsFor, nextTakeNumber, peakOf, rotateToPhrase, takeFileName, takeName, toDb } from '../engine/capture'
 import type { ChannelMode } from '../engine/capture'
-import type { RecordedTake, TakeLength } from '../engine/recorder'
+import { MAX_TAKE_BARS } from '../engine/recorder'
+import type { RecordedTake } from '../engine/recorder'
 import { DEFAULT_SAMPLE_GAIN } from '../engine/types'
 import type { Bars, Loop } from '../engine/types'
 import { useRecorder } from '../hooks/useRecorder'
@@ -10,12 +11,12 @@ import { download } from '../lib/retempo'
 import { encodeWav } from '../lib/wav'
 
 /** A recording waiting to be kept or discarded. Lives in memory only. */
-export type Take = RecordedTake & {
+export type Take = Omit<RecordedTake, 'firstBar'> & {
   id: string
   name: string
   mode: ChannelMode
-  /** Set for fixed-length takes: lets the take play in the mix like any loop. */
-  loop: Loop | null
+  /** The take as a loop, so it plays in the mix like any other. */
+  loop: Loop
   status: 'new' | 'saving' | 'kept' | 'failed'
   note?: string | undefined
 }
@@ -30,30 +31,20 @@ type Props = {
   isActive: (loopId: string) => boolean
   /** Toggle a take in or out of the mix (bar-quantized, like tapping a sample). */
   onAudition: (loop: Loop) => void
-  /** The app points this at the panel's grab action, so the G key can trigger it. */
-  grabRef: { current: (() => void) | null }
   /** A take was saved to the library as `saved`; `temp` was its in-memory stand-in. The app adds `saved` to the mix. */
   onKept: (temp: Loop, saved: Loop) => void
 }
 
 const PACK = 'Takes'
-/** How many bars the Grab button keeps. */
-export const GRAB_BARS = 8
-const LENGTHS: { value: TakeLength; label: string }[] = [
-  { value: 1, label: '1 bar' },
-  { value: 2, label: '2 bars' },
-  { value: 4, label: '4 bars' },
-  { value: 8, label: '8 bars' },
-  { value: 'free', label: 'Free' },
-]
 
 const ms = (sec: number) => `${(sec * 1000).toFixed(1)} ms`
 
-export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, isActive, onAudition, onKept, grabRef }: Props) {
+export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, isActive, onAudition, onKept }: Props) {
   const rec = useRecorder()
-  const [length, setLength] = useState<TakeLength>(4)
   const [mode, setMode] = useState<ChannelMode>('in1')
   const [message, setMessage] = useState<string | null>(null)
+  /** The long recording waiting for its bars to be picked. */
+  const [raw, setRaw] = useState<RecordedTake | null>(null)
   const takesRef = useRef(takes)
   takesRef.current = takes
   const busy = rec.status === 'armed' || rec.status === 'recording'
@@ -65,44 +56,31 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
     if (mono && mode !== 'in1') setMode('in1')
   }, [mono, mode])
 
-  /** Put a finished recording at the top of the list. `loops` is false for free takes, which cannot loop in the mix. */
-  const addTake = (r: RecordedTake, loops: boolean) => {
-    const made = new Date()
-    const name = takeName(made, nextTakeNumber([...libraryNames, ...takesRef.current.map((t) => t.name)], made))
-    const id = `take-${crypto.randomUUID()}`
-    const loop: Loop | null = loops ? { id, name, url: '', bpm: r.bpm, bars: r.bars as Bars, kind: 'sample', gain: DEFAULT_SAMPLE_GAIN, buffer: rec.toBuffer(r), tags: ['take'], pack: PACK } : null
-    setTakes((ts) => [{ ...r, id, name, mode, loop, status: 'new' }, ...ts])
-    return name
-  }
-
   const onRecord = async () => {
     setMessage(null)
     try {
-      // Fixed lengths start on a phrase boundary, so they can loop in the mix; free takes cannot.
-      addTake(await rec.record(length, mode), length !== 'free')
+      setRaw(await rec.record(mode))
     } catch (e) {
       const text = e instanceof Error ? e.message : String(e)
       if (text !== 'Take cancelled.') setMessage(text)
     }
   }
 
-  /** Keep the bars that were just played, with nothing armed beforehand. */
-  const onGrab = async () => {
-    try {
-      const name = addTake(await rec.grab(GRAB_BARS, mode), true)
-      setMessage(`Grabbed the last ${GRAB_BARS} bars as "${name}".`)
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : String(e))
-    }
+  /** The chosen bars become a loop in the stack; the rest of the recording is dropped. */
+  const addToStack = (start: number, length: number) => {
+    if (!raw) return
+    // Rotated onto the phrase so it loops in the place it was played.
+    const channels = rotateToPhrase(cutBars(raw.channels, start, length, raw.bars), raw.firstBar + start, length)
+    const made = new Date()
+    const name = takeName(made, nextTakeNumber([...libraryNames, ...takesRef.current.map((t) => t.name)], made))
+    const id = `take-${crypto.randomUUID()}`
+    const cut = { channels, sampleRate: raw.sampleRate, bpm: raw.bpm, bars: length, peak: peakOf(channels) }
+    const loop: Loop = { id, name, url: '', bpm: raw.bpm, bars: length as Bars, kind: 'sample', gain: DEFAULT_SAMPLE_GAIN, buffer: rec.toBuffer(cut), tags: ['take'], pack: PACK }
+    setTakes((ts) => [{ ...cut, id, name, mode, loop, status: 'new' }, ...ts])
+    setRaw(null)
+    setMessage(`Bars ${start + 1} to ${start + length} are in the stack as "${name}". Save it to keep it.`)
+    onAudition(loop)
   }
-  const grabNow = useRef(onGrab)
-  grabNow.current = onGrab
-  useEffect(() => {
-    grabRef.current = () => void grabNow.current()
-    return () => {
-      grabRef.current = null
-    }
-  }, [grabRef])
 
   const onCalibrate = async () => {
     setMessage(null)
@@ -115,10 +93,6 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
   const keep = async (t: Take) => {
     const blob = new Blob([encodeWav(t.channels, t.sampleRate, 24)], { type: 'audio/wav' })
     download(blob, takeFileName(t.name, t.bpm, t.bars))
-    if (!t.loop) {
-      patch(t.id, { status: 'kept', note: 'Saved to Downloads. Free takes are not added to the library or the mix, which hold 1, 2, 4 and 8 bar loops.' })
-      return
-    }
     patch(t.id, { status: 'saving', note: undefined })
     try {
       const packId = await ensurePack(PACK)
@@ -131,7 +105,7 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
   }
 
   const discard = (t: Take) => {
-    if (t.loop && isActive(t.loop.id)) onAudition(t.loop) // take it out of the mix first
+    if (isActive(t.loop.id)) onAudition(t.loop) // take it out of the mix first
     setTakes((ts) => ts.filter((x) => x.id !== t.id))
   }
 
@@ -168,52 +142,36 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
                 <option value="stereo" disabled={mono}>Inputs 1 + 2 · stereo</option>
               </select>
             </label>
-            <label className="mono-label flex flex-col gap-1 text-muted">
-              Length
-              <select value={String(length)} onChange={(e) => setLength(e.target.value === 'free' ? 'free' : (Number(e.target.value) as Bars))} disabled={busy} aria-label="Take length" className="field min-h-9 py-0 text-ink">
-                {LENGTHS.map((l) => (
-                  <option key={l.label} value={String(l.value)}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <Meter levels={rec.levels} stereo={!mono} />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {!busy ? (
-              <button type="button" onClick={() => void onRecord()} disabled={rec.status !== 'ready' || !hasStack} className="pill pill-accent min-h-11 px-6 text-[13px]">
-                ● Record
-              </button>
-            ) : (
-              <>
-                {length === 'free' && rec.status === 'recording' && rec.endsAt === null && (
-                  <button type="button" onClick={rec.finish} className="pill pill-accent min-h-11 px-6 text-[13px]">
-                    ■ End on the bar
-                  </button>
-                )}
-                <button type="button" onClick={rec.cancel} className="pill pill-outline min-h-11 px-5">
-                  Cancel take
+          {raw ? (
+            <BarPicker raw={raw} preview={rec.preview} onAdd={addToStack} onDiscard={() => setRaw(null)} />
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              {!busy ? (
+                <button type="button" onClick={() => void onRecord()} disabled={rec.status !== 'ready' || !hasStack} className="pill pill-accent min-h-11 px-6 text-[13px]">
+                  ● Record
                 </button>
-              </>
-            )}
-            {!busy && (
-              <button type="button" onClick={() => void onGrab()} disabled={rec.status !== 'ready'} className="pill min-h-11 px-6 text-[13px]" title="Keep the 8 bars you just played (G)">
-                Grab last {GRAB_BARS} bars
-                <span className="chip ml-2 border-current" aria-hidden="true">
-                  G
+              ) : (
+                <>
+                  <button type="button" onClick={rec.finish} disabled={rec.status !== 'recording' || rec.endsAt !== null} className="pill pill-accent min-h-11 px-6 text-[13px]">
+                    ■ Stop recording
+                  </button>
+                  <button type="button" onClick={rec.cancel} className="pill pill-outline min-h-11 px-5">
+                    Cancel
+                  </button>
+                </>
+              )}
+              <Progress status={rec.status} startsAt={rec.startsAt} endsAt={rec.endsAt} barSec={rec.barSec} max={rec.maxBars} now={rec.now} />
+              {!busy && !hasStack && <span className="mono-label text-muted">Tap a drum loop or a sample first: it sets the tempo.</span>}
+              {!busy && hasStack && (
+                <span className="mono-label text-muted">
+                  Records up to {MAX_TAKE_BARS} bars{playing ? ', from the next bar' : ', and starts playback'}. Stop when you are done, then pick the bars to keep.
                 </span>
-              </button>
-            )}
-            <Progress status={rec.status} startsAt={rec.startsAt} endsAt={rec.endsAt} barSec={rec.barSec} bars={rec.bars} now={rec.now} />
-            {!busy && !hasStack && <span className="mono-label text-muted">Tap a drum loop or a sample first: it sets the tempo.</span>}
-            {!busy && hasStack && !playing && <span className="mono-label text-muted">Playback starts with the take; you hear {length === 'free' ? 'one bar' : 'the phrase once'} before recording begins.</span>}
-          </div>
-
-          <p className="mono-label max-w-2xl normal-case leading-relaxed text-muted">
-            Jamming? Loop Lab is always listening while the input is connected. Press G, or the Grab button, to keep the {GRAB_BARS} bars before the last bar line. It works after you stop too, for about a minute.
-          </p>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col gap-2 border-t border-line pt-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -247,7 +205,7 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
       {takes.length > 0 && (
         <ul className="border-t border-line" aria-label="Takes">
           {takes.map((t) => {
-            const inMix = !!t.loop && isActive(t.loop.id)
+            const inMix = isActive(t.loop.id)
             const db = toDb(t.peak)
             const level = t.peak < 0.001 ? 'no signal' : t.peak >= 0.999 ? 'clipped' : `peak ${db.toFixed(1)} dB`
             return (
@@ -261,8 +219,8 @@ export function RecordPanel({ takes, setTakes, playing, hasStack, libraryNames, 
                   {t.note && <span className={['mono-label block normal-case', t.status === 'failed' ? 'text-accent' : 'text-muted'].join(' ')}>{t.note}</span>}
                 </span>
                 <span className="flex gap-1.5">
-                  {t.loop && t.status !== 'kept' && (
-                    <button type="button" onClick={() => onAudition(t.loop!)} aria-pressed={inMix} className={['pill min-h-9 px-4', inMix ? 'pill-accent' : 'pill-outline'].join(' ')}>
+                  {t.status !== 'kept' && (
+                    <button type="button" onClick={() => onAudition(t.loop)} aria-pressed={inMix} className={['pill min-h-9 px-4', inMix ? 'pill-accent' : 'pill-outline'].join(' ')}>
                       {inMix ? 'In the mix' : 'Hear it'}
                     </button>
                   )}
@@ -321,8 +279,8 @@ function Meter({ levels, stereo }: { levels: () => [number, number]; stereo: boo
   )
 }
 
-/** "Starts in 2 bars" / "Recording · bar 3 of 4", read off the audio clock. */
-function Progress({ status, startsAt, endsAt, barSec, bars, now }: { status: string; startsAt: number | null; endsAt: number | null; barSec: number; bars: number | null; now: () => number }) {
+/** "Starts on the next bar" / "Recording · bar 12 of 64 max", read off the audio clock. */
+function Progress({ status, startsAt, endsAt, barSec, max, now }: { status: string; startsAt: number | null; endsAt: number | null; barSec: number; max: number; now: () => number }) {
   const [, force] = useState(0)
   const live = status === 'armed' || status === 'recording'
   useEffect(() => {
@@ -333,17 +291,128 @@ function Progress({ status, startsAt, endsAt, barSec, bars, now }: { status: str
   if (!live || startsAt === null || !(barSec > 0)) return null
   const t = now()
   let text: string
-  if (t < startsAt) {
-    const left = Math.ceil((startsAt - t) / barSec - 1e-6)
-    text = left <= 1 ? 'Starts on the next bar' : `Starts in ${left} bars`
-  } else {
-    const bar = Math.floor((t - startsAt) / barSec) + 1
-    text = bars === null ? `Recording · bar ${bar}` : bar > bars ? 'Finishing…' : `Recording · bar ${bar} of ${bars}`
-    if (endsAt !== null && bars !== null && t >= endsAt) text = 'Finishing…'
-  }
+  if (t < startsAt) text = 'Starts on the next bar'
+  else if (endsAt !== null) text = t >= endsAt ? 'Finishing…' : 'Ending on the bar…'
+  else text = `Recording · bar ${Math.min(max, Math.floor((t - startsAt) / barSec) + 1)} of ${max} max`
   return (
     <span className="mono-label font-bold text-accent" role="status" aria-live="polite">
       {text}
     </span>
+  )
+}
+
+/**
+ * After a recording: every bar as a tile with its own small waveform.
+ * Choose a length, tap the bar to start from, listen, then add the run of
+ * bars to the stack. The rest of the recording is dropped.
+ */
+function BarPicker({
+  raw,
+  preview,
+  onAdd,
+  onDiscard,
+}: {
+  raw: RecordedTake
+  preview: (channels: readonly Float32Array[], sampleRate: number, onEnded?: () => void) => () => void
+  onAdd: (start: number, length: number) => void
+  onDiscard: () => void
+}) {
+  const lengths = lengthsFor(raw.bars)
+  // Start on the last 8 bars (or as many as there are): usually where the keeper is.
+  const [length, setLength] = useState<number>(() => [...lengths].reverse().find((l) => l <= 8) ?? 1)
+  const [start, setStart] = useState(() => Math.max(0, raw.bars - ([...lengths].reverse().find((l) => l <= 8) ?? 1)))
+  const peaks = useMemo(() => barPeaks(raw.channels, raw.bars), [raw])
+  const stopRef = useRef<(() => void) | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+  const sel = clampSelection(start, length, raw.bars) ?? { start: 0, length: 1 }
+
+  const stopPreview = () => {
+    stopRef.current?.()
+    stopRef.current = null
+  }
+  useEffect(() => stopPreview, []) // leaving the picker silences a preview
+
+  const pick = (s: number, l: number) => {
+    stopPreview()
+    const next = clampSelection(s, l, raw.bars)
+    if (!next) return
+    setStart(next.start)
+    setLength(next.length)
+  }
+
+  const onPreview = () => {
+    if (previewing) return stopPreview()
+    setPreviewing(true)
+    stopRef.current = preview(cutBars(raw.channels, sel.start, sel.length, raw.bars), raw.sampleRate, () => setPreviewing(false))
+  }
+
+  return (
+    <div className="flex flex-col gap-4" aria-label="Pick the bars to keep">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p className="text-sm font-bold">
+          Recorded {raw.bars} bar{raw.bars === 1 ? '' : 's'} at {raw.bpm} BPM. Pick the bars to loop.
+        </p>
+        <div className="flex items-center gap-1.5" role="group" aria-label="Loop length in bars">
+          <span className="mono-label mr-1 text-muted">Length</span>
+          {lengths.map((l) => (
+            <button key={l} type="button" onClick={() => pick(sel.start, l)} aria-pressed={sel.length === l} className={['pill min-h-9 min-w-10 px-3', sel.length === l ? '' : 'pill-outline'].join(' ')}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1 sm:grid-cols-8 lg:grid-cols-16" role="group" aria-label="Bars">
+        {peaks.map((row, b) => {
+          const on = b >= sel.start && b < sel.start + sel.length
+          return (
+            <button
+              key={b}
+              type="button"
+              onClick={() => pick(b, sel.length)}
+              aria-pressed={on}
+              aria-label={`Bar ${b + 1}${on ? ', selected' : ''}`}
+              title={`Start the loop at bar ${b + 1}`}
+              className={['relative flex h-14 items-end gap-px px-1 pb-1 pt-4 transition-colors duration-150', on ? 'bg-ink text-cream' : 'bg-ink/10 text-ink hover:bg-ink/20'].join(' ')}
+            >
+              <span className="mono-label absolute left-1 top-0.5 text-[9px] opacity-70">{b + 1}</span>
+              {row.map((p, k) => (
+                <span key={k} className="block flex-1 bg-current" style={{ height: `${Math.max(4, Math.sqrt(p) * 100)}%` }} />
+              ))}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mono-label font-bold" aria-live="polite">
+          {sel.length === 1 ? `Bar ${sel.start + 1}` : `Bars ${sel.start + 1} to ${sel.start + sel.length}`}
+        </span>
+        <button type="button" onClick={onPreview} aria-pressed={previewing} className={['pill min-h-11 px-5', previewing ? 'pill-accent' : 'pill-outline'].join(' ')}>
+          {previewing ? '■ Stop' : '▶ Listen'}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            stopPreview()
+            onAdd(sel.start, sel.length)
+          }}
+          className="pill min-h-11 px-6 text-[13px]"
+        >
+          Add to stack
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            stopPreview()
+            onDiscard()
+          }}
+          className="pill pill-outline min-h-11 px-5"
+        >
+          Discard recording
+        </button>
+      </div>
+      <p className="mono-label max-w-2xl normal-case leading-relaxed text-muted">Tap a bar to start the loop there. The loop joins the stack in the same place you played it, and the rest of this recording is thrown away.</p>
+    </div>
   )
 }
