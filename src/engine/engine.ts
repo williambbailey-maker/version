@@ -1,7 +1,7 @@
-import { Booster, DEFAULT_PRESET_ID, boostPreset } from './booster'
 import { ensureRunning, getContext } from './context'
 import { Loader } from './loader'
 import { Slot } from './slot'
+import type { BoostState } from './slot'
 import { Transport } from './transport'
 import type { LoadedLoop, Loop } from './types'
 import { isPowerOfTwoBars } from './types'
@@ -11,7 +11,7 @@ const START_LEAD = 0.05
 /** A bar boundary closer than this is skipped when scheduling a swap. */
 const SWAP_MIN_LEAD = 0.02
 
-export type BoostState = { on: boolean; preset: string }
+export type { BoostState } from './slot'
 
 export type SlotState = {
   loop: Loop | null    // sounding (or scheduled)
@@ -20,11 +20,13 @@ export type SlotState = {
   muted: boolean
   solo: boolean
   speed: 1 | 2         // 2 = double time (playbackRate doubled)
+  boost: BoostState    // this track's effect (compressor chain)
 }
 
 export type StackInput = {
   drums: Loop | null
-  samples: { loop: Loop; gain: number; muted: boolean; solo: boolean; speed?: 1 | 2 }[]
+  samples: { loop: Loop; gain: number; muted: boolean; solo: boolean; speed?: 1 | 2; boost?: BoostState | null }[]
+  /** The drum track's effect. */
   boost?: BoostState | null
 }
 
@@ -33,7 +35,6 @@ export type EngineState = {
   masterBPM: number
   barSec: number
   drums: SlotState
-  boost: BoostState // drum booster (compressor chain)
   samples: SlotState[] // one per active sample loop, in the order they were added
   masterGain: number // output level after all tracks: 0..MASTER_MAX, 1 = unchanged
   loading: readonly string[] // loop ids currently being fetched/decoded
@@ -65,8 +66,6 @@ export class Engine {
   readonly master: GainNode
 
   private drums: Slot
-  private booster: Booster | null = null // built on first use
-  private boost: BoostState = { on: false, preset: DEFAULT_PRESET_ID }
   private samples = new Map<string, Slot>() // keyed by loop id
   /** Sample loads in flight; a second tap before the load lands cancels it. */
   private adding = new Set<string>()
@@ -132,7 +131,7 @@ export class Engine {
    */
   async select(loop: Loop): Promise<void> {
     if (!isPowerOfTwoBars(loop.bars)) {
-      throw new RangeError(`Loop "${loop.name}" has ${loop.bars} bars; must be 1, 2, 4 or 8`)
+      throw new RangeError(`Loop "${loop.name}" has ${loop.bars} bars; must be 1, 2, 4, 8 or 16`)
     }
     if (loop.kind === 'drums') return this.selectDrums(loop)
     if (this.samples.has(loop.id)) return this.removeSample(loop.id)
@@ -150,13 +149,7 @@ export class Engine {
    */
   async loadStack(stack: StackInput): Promise<void> {
     if (stack.drums) await this.selectDrums(stack.drums)
-    if (stack.boost !== undefined) {
-      const b = stack.boost ?? { on: false, preset: DEFAULT_PRESET_ID }
-      if (b.on || this.booster) {
-        this.setBoostPreset(b.preset)
-        this.setBoost(b.on)
-      }
-    }
+    if (stack.boost !== undefined) restoreBoost(this.drums, stack.boost)
     const keep = new Set(stack.samples.map((s) => s.loop.id))
     for (const id of [...this.samples.keys()]) if (!keep.has(id)) this.removeSample(id)
     for (const s of stack.samples) {
@@ -167,6 +160,7 @@ export class Engine {
       slot.muted = s.muted
       slot.solo = s.solo
       this.setSpeed(s.loop.id, s.speed ?? 1)
+      if (s.boost !== undefined) restoreBoost(slot, s.boost)
     }
     this.applyMix()
     this.emit()
@@ -180,7 +174,7 @@ export class Engine {
     if (!this.samples.has(oldId)) return this.select(loop)
     if (this.samples.has(loop.id) || loop.id === oldId) return
     if (!isPowerOfTwoBars(loop.bars)) {
-      throw new RangeError(`Loop "${loop.name}" has ${loop.bars} bars; must be 1, 2, 4 or 8`)
+      throw new RangeError(`Loop "${loop.name}" has ${loop.bars} bars; must be 1, 2, 4, 8 or 16`)
     }
     const loaded = await this.load(loop)
     const old = this.samples.get(oldId)
@@ -189,6 +183,7 @@ export class Engine {
     slot.muted = old.muted
     slot.solo = old.solo
     slot.speed = old.speed
+    restoreBoost(slot, old.boost) // the column keeps its effect
     this.samples = new Map([...this.samples.entries()].map(([id, s]) => (id === oldId ? [loop.id, slot] : [id, s])))
     const now = this.ctx.currentTime
     const at = this.playing ? this.transport.nextBar(now, SWAP_MIN_LEAD) : now
@@ -265,22 +260,19 @@ export class Engine {
     this.emit()
   }
 
-  /** Drum booster on/off. The chain is built the first time it's switched on. */
-  setBoost(on: boolean): void {
-    if (on && !this.booster) {
-      this.booster = new Booster(this.ctx)
-      this.booster.apply(boostPreset(this.boost.preset).params)
-      this.drums.setInsert(this.booster)
-    }
-    this.boost = { ...this.boost, on }
-    this.booster?.setOn(on)
+  /** Effect on/off for one track (drums or a sample). */
+  setBoost(loopId: string, on: boolean): void {
+    const slot = this.slotFor(loopId)
+    if (!slot) return
+    slot.setBoost(on)
     this.emit()
   }
 
-  setBoostPreset(id: string): void {
-    const preset = boostPreset(id)
-    this.boost = { ...this.boost, preset: preset.id }
-    this.booster?.apply(preset.params)
+  /** Effect preset for one track. */
+  setBoostPreset(loopId: string, id: string): void {
+    const slot = this.slotFor(loopId)
+    if (!slot) return
+    slot.setBoostPreset(id)
     this.emit()
   }
 
@@ -435,13 +427,12 @@ export class Engine {
   }
 
   private snapshot(): EngineState {
-    const s = (slot: Slot): SlotState => ({ loop: slot.loop, pending: slot.pending, gain: slot.level, muted: slot.muted, solo: slot.solo, speed: slot.speed })
+    const s = (slot: Slot): SlotState => ({ loop: slot.loop, pending: slot.pending, gain: slot.level, muted: slot.muted, solo: slot.solo, speed: slot.speed, boost: slot.boost })
     return {
       playing: this.playing,
       masterBPM: this.transport.masterBPM,
       barSec: this.transport.barSec,
       drums: s(this.drums),
-      boost: this.boost,
       samples: [...this.samples.values()].map(s),
       masterGain: this.masterLevel,
       loading: [...this.loading],
@@ -453,6 +444,12 @@ export class Engine {
     this._state = this.snapshot()
     for (const fn of this.listeners) fn()
   }
+}
+
+/** Put a saved effect state back on a track without building the chain for one that is off. */
+function restoreBoost(slot: Slot, boost: BoostState | null): void {
+  slot.setBoostPreset(boost?.preset ?? 'default')
+  slot.setBoost(boost?.on ?? false)
 }
 
 let singleton: Engine | null = null

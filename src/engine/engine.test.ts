@@ -109,16 +109,69 @@ describe('Engine', () => {
     expect(engine.state.samples[0]!.loop?.id).toBe('a')
   })
 
-  it('drum booster: off by default, on builds the chain, presets and sessions round-trip', async () => {
+  it('drum effect: off by default, on builds the chain, presets and sessions round-trip', async () => {
     const { engine } = make()
-    expect(engine.state.boost).toEqual({ on: false, preset: 'default' })
-    engine.setBoostPreset('slam')
-    engine.setBoost(true)
-    expect(engine.state.boost).toEqual({ on: true, preset: 'slam' })
+    await engine.select(loop('d', 'drums', 100))
+    expect(engine.state.drums.boost).toEqual({ on: false, preset: 'default' })
+    engine.setBoostPreset('d', 'slam')
+    engine.setBoost('d', true)
+    expect(engine.state.drums.boost).toEqual({ on: true, preset: 'slam' })
     await engine.loadStack({ drums: loop('d', 'drums', 100), samples: [], boost: { on: false, preset: 'glue' } })
-    expect(engine.state.boost).toEqual({ on: false, preset: 'glue' })
-    engine.setBoostPreset('not-a-preset')
-    expect(engine.state.boost.preset).toBe('default')
+    expect(engine.state.drums.boost).toEqual({ on: false, preset: 'glue' })
+    engine.setBoostPreset('d', 'not-a-preset')
+    expect(engine.state.drums.boost.preset).toBe('default')
+  })
+
+  it('every track has its own effect, independent of the others', async () => {
+    const { engine } = make()
+    await engine.select(loop('d', 'drums', 100))
+    await engine.select(loop('a', 'sample', 88))
+    await engine.select(loop('b', 'sample', 120, 1))
+    engine.setBoostPreset('a', 'master-hump')
+    engine.setBoost('a', true)
+    engine.setBoostPreset('b', 'master-bump')
+    const fx = () => [engine.state.drums.boost, ...engine.state.samples.map((s) => s.boost)]
+    expect(fx()).toEqual([
+      { on: false, preset: 'default' },
+      { on: true, preset: 'master-hump' },
+      { on: false, preset: 'master-bump' },
+    ])
+    engine.setBoost('d', true)
+    engine.setBoost('a', false)
+    expect(fx().map((b) => b.on)).toEqual([true, false, false])
+    engine.setBoost('nope', true) // unknown track: ignored
+    expect(fx().map((b) => b.on)).toEqual([true, false, false])
+  })
+
+  it('a track keeps its effect when its sample is stepped, and stacks restore each track', async () => {
+    const { engine } = make()
+    await engine.select(loop('d', 'drums', 100))
+    await engine.select(loop('a', 'sample', 88))
+    engine.setBoostPreset('a', 'glue')
+    engine.setBoost('a', true)
+    await engine.replaceSample('a', loop('c', 'sample', 90))
+    expect(engine.state.samples[0]!.loop ?? engine.state.samples[0]!.pending).toMatchObject({ id: 'c' })
+    expect(engine.state.samples[0]!.boost).toEqual({ on: true, preset: 'glue' })
+    await engine.loadStack({
+      drums: loop('d', 'drums', 100),
+      samples: [
+        { loop: loop('x', 'sample', 100), gain: 0.2, muted: false, solo: false, boost: { on: true, preset: 'slam' } },
+        { loop: loop('y', 'sample', 100), gain: 0.2, muted: false, solo: false, boost: null },
+        { loop: loop('z', 'sample', 100), gain: 0.2, muted: false, solo: false }, // saved before tracks had effects
+      ],
+    })
+    expect(engine.state.samples.map((s) => s.boost)).toEqual([
+      { on: true, preset: 'slam' },
+      { on: false, preset: 'default' },
+      { on: false, preset: 'default' },
+    ])
+  })
+
+  it('accepts 16-bar loops and still refuses odd lengths', async () => {
+    const { engine } = make()
+    await engine.select(loop('long', 'sample', 100, 16))
+    expect(engine.isActive('long')).toBe(true)
+    await expect(engine.select({ ...loop('odd', 'sample', 100), bars: 3 as never })).rejects.toThrow(/must be 1, 2, 4, 8 or 16/)
   })
 
   it('2x doubles a sample\'s rate on the next bar and sticks across stop/play', async () => {

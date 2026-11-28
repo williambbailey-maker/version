@@ -87,22 +87,6 @@ function Studio() {
     setShowRecord(true)
     setTimeout(() => jump('record'), 30)
   }
-  // G grabs the bars just played, from anywhere on the page (a foot pedal that types G works too).
-  const grabRef = useRef<(() => void) | null>(null)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'g' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return
-      const el = e.target as HTMLElement | null
-      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return // typing, not grabbing
-      e.preventDefault()
-      if (grabRef.current) return grabRef.current()
-      // The panel is hidden: open it, then grab once it has mounted.
-      setShowRecord(true)
-      setTimeout(() => grabRef.current?.(), 60)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
   const openRetempo = () => {
     setShowRetempo(true)
     setTimeout(() => jump('retempo'), 30)
@@ -449,9 +433,8 @@ function Studio() {
             onStep={onStep}
             favoriteIds={favoriteIds}
             onFavorite={(loop) => onFavorite(library.find((l) => l.id === loop.id) ?? loop)}
-            boost={engine.boost}
-            onBoost={engine.setBoost}
-            onBoostPreset={engine.setBoostPreset}
+            onBoost={(loop, on) => engine.setBoost(loop.id, on)}
+            onBoostPreset={(loop, id) => engine.setBoostPreset(loop.id, id)}
             masterGain={engine.masterGain}
             onMasterGain={onMasterGain}
           />
@@ -475,7 +458,6 @@ function Studio() {
               libraryNames={libraryNames}
               isActive={engine.isActive}
               onAudition={onSelect}
-              grabRef={grabRef}
               onKept={(temp, saved) => {
                 // A saved take always ends up in the stack. If the in-memory take was
                 // already there, the saved copy takes its place (same column, same

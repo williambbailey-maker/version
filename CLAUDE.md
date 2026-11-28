@@ -16,7 +16,7 @@ type Loop = {
   name: string
   url: string          // Supabase Storage
   bpm: number          // native tempo of the recording
-  bars: 1 | 2 | 4 | 8  // length in bars, 4/4 assumed
+  bars: 1 | 2 | 4 | 8 | 16  // length in bars, 4/4 assumed
   kind: 'drums' | 'sample'
   gain: number         // 0..1, default 0.8
   buffer?: AudioBuffer // decoded, in-memory only

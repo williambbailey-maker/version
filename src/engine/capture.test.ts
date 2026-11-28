@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { captureStartFrame, covers, lastBars, measureLatency, nextTakeNumber, peakOf, rotateToPhrase, phraseStart, sliceBlocks, takeFileName, takeFrames, takeName, toDb } from './capture'
+import { barPeaks, captureStartFrame, clampSelection, covers, cutBars, lengthsFor, measureLatency, nextTakeNumber, peakOf, rotateToPhrase, phraseStart, sliceBlocks, takeFileName, takeFrames, takeName, toDb } from './capture'
 import type { Block } from './capture'
 import { matchDevice } from './recorder'
 
@@ -46,22 +46,35 @@ describe('phraseStart', () => {
   })
 })
 
-describe('grabbing what was just played', () => {
-  const grid = { start: 10, barSec: 2, end: null }
-  it('takes the bars before the last bar line', () => {
-    // 11.4 bars in: bars 3..10 are the last 8 complete ones
-    expect(lastBars(grid, 10 + 11.4 * 2, 8)).toEqual({ at: 10 + 3 * 2, firstBar: 3 })
-    expect(lastBars(grid, 10 + 16 * 2, 8)).toEqual({ at: 10 + 8 * 2, firstBar: 8 })
+describe('picking bars out of a long recording', () => {
+  it('offers only the loop lengths that fit', () => {
+    expect(lengthsFor(64)).toEqual([1, 2, 4, 8, 16])
+    expect(lengthsFor(11)).toEqual([1, 2, 4, 8])
+    expect(lengthsFor(3)).toEqual([1, 2])
+    expect(lengthsFor(0)).toEqual([])
   })
-  it('refuses until that many bars have been played', () => {
-    expect(lastBars(grid, 10 + 7.9 * 2, 8)).toBeNull()
-    expect(lastBars(grid, 10 + 8 * 2, 8)).toEqual({ at: 10, firstBar: 0 })
+  it('keeps a selection inside the recording', () => {
+    expect(clampSelection(5, 4, 20)).toEqual({ start: 5, length: 4 })
+    expect(clampSelection(18, 4, 20)).toEqual({ start: 16, length: 4 }) // pulled back to fit
+    expect(clampSelection(-3, 8, 20)).toEqual({ start: 0, length: 8 })
+    expect(clampSelection(0, 16, 12)).toBeNull()
   })
-  it('after a stop, counts no further than where playback ended', () => {
-    const stopped = { start: 10, barSec: 2, end: 10 + 12 * 2 }
-    expect(lastBars(stopped, 500, 8)).toEqual({ at: 10 + 4 * 2, firstBar: 4 })
-    // the tail of the last bar has not arrived yet: hold at the bar before
-    expect(lastBars(stopped, 10 + 11.5 * 2, 8)).toEqual({ at: 10 + 3 * 2, firstBar: 3 })
+  it('cuts exactly the chosen bars', () => {
+    // 6 bars of 4 frames, each frame holding its bar number
+    const rec = [Float32Array.from({ length: 24 }, (_, i) => Math.floor(i / 4))]
+    expect(cutBars(rec, 2, 2, 6)).toEqual([Float32Array.from([2, 2, 2, 2, 3, 3, 3, 3])])
+    expect(cutBars(rec, 5, 1, 6)[0]).toEqual(Float32Array.from([5, 5, 5, 5]))
+    // a length that does not divide evenly still comes out the right size overall
+    const odd = [new Float32Array(1000)]
+    expect(cutBars(odd, 0, 3, 3)[0]).toHaveLength(1000)
+    expect(cutBars(odd, 1, 1, 3)[0]!.length + cutBars(odd, 0, 1, 3)[0]!.length + cutBars(odd, 2, 1, 3)[0]!.length).toBe(1000)
+  })
+  it('draws a small waveform per bar', () => {
+    const rec = [Float32Array.from({ length: 800 }, (_, i) => (i < 400 ? 0 : i < 600 ? 0.5 : -1))]
+    const peaks = barPeaks(rec, 2, 4)
+    expect(peaks).toHaveLength(2)
+    expect(peaks[0]).toEqual([0, 0, 0, 0])
+    expect(peaks[1]).toEqual([0.5, 0.5, 1, 1])
   })
   it('rotates a grab so it loops where it was played', () => {
     // 4 bars of 2 frames, each frame labelled with the grid bar it was played in

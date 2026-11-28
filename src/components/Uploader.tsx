@@ -13,7 +13,7 @@ type Props = {
   onAdded: (loop: Loop) => void
 }
 
-const BARS: readonly Bars[] = [1, 2, 4, 8]
+const BARS: readonly Bars[] = [1, 2, 4, 8, 16]
 
 const SOURCE_LABEL: Record<TempoSource, string> = {
   filename: 'bpm from filename, bars from length',

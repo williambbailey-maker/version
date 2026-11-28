@@ -1,6 +1,6 @@
 import { BOOST_PRESETS } from '../engine/booster'
 import { MASTER_MAX } from '../engine/engine'
-import type { BoostState, SlotState } from '../engine/engine'
+import type { SlotState } from '../engine/engine'
 import type { Loop } from '../engine/types'
 import { StripeFader } from './StripeFader'
 
@@ -24,16 +24,16 @@ type Props = {
   onStep: (loop: Loop, dir: 1 | -1) => void
   favoriteIds: ReadonlySet<string>
   onFavorite: (loop: Loop) => void
-  boost: BoostState
-  onBoost: (on: boolean) => void
-  onBoostPreset: (id: string) => void
+  /** Each track's own effect: on/off and preset. */
+  onBoost: (loop: Loop, on: boolean) => void
+  onBoostPreset: (loop: Loop, id: string) => void
   /** Overall output level, 0..MASTER_MAX (1 = unchanged). */
   masterGain: number
   onMasterGain: (value: number) => void
 }
 
 /** What's playing (or queued): one stripe column each. */
-export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, onStep, favoriteIds, onFavorite, boost, onBoost, onBoostPreset, masterGain, onMasterGain }: Props) {
+export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onSolo, onSpeed, onStep, favoriteIds, onFavorite, onBoost, onBoostPreset, masterGain, onMasterGain }: Props) {
   const cols: { slot: SlotState; loop: Loop; removable: boolean }[] = []
   const d = drums.loop ?? drums.pending
   if (d) cols.push({ slot: drums, loop: d, removable: false })
@@ -90,26 +90,24 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
                   {favoriteIds.has(loop.id) ? '★' : '☆'}
                 </button>
               )}
-              {loop.kind === 'drums' && (
-                <button
-                  type="button"
-                  aria-pressed={boost.on}
-                  aria-label={`Boost ${loop.name}: compressor`}
-                  title="Compressor booster"
-                  onClick={() => onBoost(!boost.on)}
-                  className={['pill min-h-7 flex-1 px-2', boost.on ? 'pill-accent' : 'pill-outline'].join(' ')}
-                >
-                  ★
-                </button>
-              )}
             </div>
-            {loop.kind === 'drums' && boost.on && (
+            <button
+              type="button"
+              aria-pressed={slot.boost.on}
+              aria-label={`Effect on ${loop.name}`}
+              title="Compressor effect for this track"
+              onClick={() => onBoost(loop, !slot.boost.on)}
+              className={['pill min-h-7 px-2', slot.boost.on ? 'pill-accent' : 'pill-outline'].join(' ')}
+            >
+              FX
+            </button>
+            {slot.boost.on && (
               <label className="mono-label flex flex-col gap-1 text-muted">
                 Preset
                 <select
-                  aria-label="Compressor preset"
-                  value={boost.preset}
-                  onChange={(e) => onBoostPreset(e.target.value)}
+                  aria-label={`Effect preset for ${loop.name}`}
+                  value={slot.boost.preset}
+                  onChange={(e) => onBoostPreset(loop, e.target.value)}
                   className="pill pill-outline min-h-7 w-full appearance-none px-2 text-[10px]"
                 >
                   {GROUPS.map((g) => (
@@ -123,7 +121,7 @@ export function Mixer({ masterBPM, drums, samples, onGain, onRemove, onMute, onS
                   ))}
                 </select>
                 {(() => {
-                  const note = BOOST_PRESETS.find((x) => x.id === boost.preset)?.note
+                  const note = BOOST_PRESETS.find((x) => x.id === slot.boost.preset)?.note
                   return note ? <span className="normal-case">{note}</span> : null
                 })()}
               </label>

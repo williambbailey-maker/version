@@ -31,3 +31,23 @@ describe('resolveStack', () => {
     expect(r.missing).toBe(1)
   })
 })
+
+describe('track effects in sessions', () => {
+  const off = { on: false, preset: 'default' }
+  it('saves each track\'s effect and restores it', () => {
+    const state = {
+      playing: true, masterBPM: 100, barSec: 2.4, masterGain: 1, loading: [], error: null,
+      drums: { loop: L('d', 'drums'), pending: null, gain: 0.8, muted: false, solo: false, speed: 1, boost: { on: true, preset: 'master-bump' } },
+      samples: [
+        { loop: L('a'), pending: null, gain: 0.5, muted: false, solo: false, speed: 1, boost: { on: true, preset: 'master-hump' } },
+        { loop: L('b'), pending: null, gain: 0.5, muted: false, solo: false, speed: 2, boost: off },
+      ],
+    } as EngineState
+    const snap = snapshotStack(state)
+    expect(snap.boost).toEqual({ on: true, preset: 'master-bump' })
+    expect(snap.samples.map((x) => x.boost)).toEqual([{ on: true, preset: 'master-hump' }, off])
+    const r = resolveStack({ id: 's', name: 'x', drumsLoopId: 'd', updatedAt: '', notes: '', boost: snap.boost, samples: snap.samples }, [L('d', 'drums'), L('a'), L('b')])
+    expect(r.boost).toEqual({ on: true, preset: 'master-bump' })
+    expect(r.samples.map((x) => x.boost)).toEqual([{ on: true, preset: 'master-hump' }, off])
+  })
+})

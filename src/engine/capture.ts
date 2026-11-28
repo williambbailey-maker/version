@@ -42,22 +42,8 @@ export function phraseStart(transportStart: number, now: number, barSec: number,
 }
 
 /**
- * The most recent `bars` complete bars on a grid, for grabbing what was just
- * played. `heard` is the newest moment the input can have delivered (now
- * minus the round trip); a stopped grid counts no further than its end.
- * Null when fewer than `bars` bars have been played on this grid.
- */
-export function lastBars(grid: { start: number; barSec: number; end: number | null }, heard: number, bars: number): { at: number; firstBar: number } | null {
-  if (!(grid.barSec > 0)) return null
-  const limit = grid.end === null ? heard : Math.min(heard, grid.end)
-  const done = Math.floor((limit - grid.start) / grid.barSec + 1e-9)
-  if (done < bars) return null
-  return { at: grid.start + (done - bars) * grid.barSec, firstBar: done - bars }
-}
-
-/**
- * Rotate a grabbed take so its first bar is one the grid counts as a
- * multiple of the take length. A loop is circular, so nothing is lost, and
+ * Rotate a cut so its first bar is one the grid counts as a multiple of
+ * the cut's length (`firstBar` is the grid bar the cut starts on). A loop is circular, so nothing is lost, and
  * the take then loops in exactly the place it was played against the drums.
  */
 export function rotateToPhrase(channels: readonly Float32Array[], firstBar: number, bars: number): Float32Array[] {
@@ -70,6 +56,57 @@ export function rotateToPhrase(channels: readonly Float32Array[], firstBar: numb
     out.set(c.subarray(0, shift), c.length - shift)
     return out
   })
+}
+
+/** Loop lengths a selection may have, in bars. */
+export const LOOP_LENGTHS = [1, 2, 4, 8, 16] as const
+export type LoopLength = (typeof LOOP_LENGTHS)[number]
+
+/** The lengths that fit inside a recording of `total` bars. */
+export function lengthsFor(total: number): LoopLength[] {
+  return LOOP_LENGTHS.filter((l) => l <= total)
+}
+
+/**
+ * Keep a selection inside the recording: `start` is pulled back so the
+ * whole run of `length` bars fits. Null when the recording is shorter
+ * than `length`.
+ */
+export function clampSelection(start: number, length: number, total: number): { start: number; length: number } | null {
+  if (!(length >= 1) || length > total) return null
+  return { start: Math.max(0, Math.min(Math.round(start), total - length)), length }
+}
+
+/** Cut `length` consecutive bars, starting at bar `start`, out of a recording of `total` bars. */
+export function cutBars(channels: readonly Float32Array[], start: number, length: number, total: number): Float32Array[] {
+  return channels.map((c) => {
+    const from = Math.round((start * c.length) / total)
+    const to = Math.round(((start + length) * c.length) / total)
+    return c.slice(from, to)
+  })
+}
+
+/**
+ * A small waveform per bar, for the bar picker: `bins` peak values (0..1)
+ * across each bar, taken over all channels.
+ */
+export function barPeaks(channels: readonly Float32Array[], bars: number, bins = 16): number[][] {
+  const frames = channels[0]?.length ?? 0
+  const out: number[][] = []
+  for (let b = 0; b < bars; b++) {
+    const row: number[] = []
+    for (let k = 0; k < bins; k++) {
+      const from = Math.floor(((b * bins + k) * frames) / (bars * bins))
+      const to = Math.floor(((b * bins + k + 1) * frames) / (bars * bins))
+      let p = 0
+      // A stride keeps a 64-bar recording quick to scan; peaks do not need every sample.
+      const step = Math.max(1, Math.floor((to - from) / 64))
+      for (const c of channels) for (let i = from; i < to; i += step) p = Math.max(p, Math.abs(c[i]!))
+      row.push(Math.min(1, p))
+    }
+    out.push(row)
+  }
+  return out
 }
 
 /** True once the captured blocks reach `endFrame` (exclusive). */
